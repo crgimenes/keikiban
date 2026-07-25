@@ -68,8 +68,9 @@ let state = { path: "", exists: false, error: "", connections: [] };
 let editingIndex = null;
 // listOpen: the connections editor is open on top of the dashboard.
 let listOpen = false;
-// indexesOpen: the index-health screen is open on top of the dashboard.
+// indexesOpen / maintOpen: a report screen is open on top of the dashboard.
 let indexesOpen = false;
+let maintOpen = false;
 
 const WINDOW_KEY = "keikiban.window";
 let windowSeconds = Number(localStorage.getItem(WINDOW_KEY)) || 300;
@@ -159,8 +160,10 @@ function render() {
     editingIndex >= 0 ? "Edit connection" : "Add a PostgreSQL connection";
   el("list").hidden = formOpen || !listOpen;
   el("back").hidden = false;
-  el("indexes").hidden = formOpen || listOpen || !indexesOpen;
-  el("dashboard").hidden = formOpen || listOpen || indexesOpen;
+  const overlay = formOpen || listOpen;
+  el("indexes").hidden = overlay || !indexesOpen;
+  el("maintenance").hidden = overlay || !maintOpen;
+  el("dashboard").hidden = overlay || indexesOpen || maintOpen;
 
   const box = el("connections");
   box.replaceChildren();
@@ -927,6 +930,322 @@ el("idx-back").addEventListener("click", () => {
 });
 el("idx-refresh").addEventListener("click", loadIndexes);
 
+// --- Maintenance screen ---
+
+let maint = null;
+// maintConfirming: "vacuum:<schema>.<table>", "cancel:<pid>" or
+// "terminate:<pid>" while its confirmation is on screen.
+let maintConfirming = null;
+
+function ago(seconds) {
+  if (seconds < 0) return "never";
+  if (seconds < 90) return Math.round(seconds) + "s ago";
+  if (seconds < 5400) return Math.round(seconds / 60) + "min ago";
+  if (seconds < 172800) return Math.round(seconds / 3600) + "h ago";
+  return Math.round(seconds / 86400) + "d ago";
+}
+
+async function loadMaintenance() {
+  el("maint-status").textContent = "Collecting maintenance statistics...";
+  try {
+    maint = await window.maintenanceReport();
+  } catch (err) {
+    el("maint-status").textContent = String(err);
+    return;
+  }
+  renderMaintenance();
+}
+
+function renderMaintenance() {
+  const m = maint;
+  if (!m) return;
+  el("maint-status").textContent = m.error || "";
+
+  const wrap = el("maint-wraparound");
+  wrap.replaceChildren();
+  const line = document.createElement("span");
+  line.className = "idx-meta";
+  const pct = document.createElement("span");
+  pct.textContent = "database at " + m.wraparoundPct + "% of the freeze " +
+    "threshold (" + m.databaseAge.toLocaleString() + " of " +
+    m.freezeMaxAge.toLocaleString() + " transactions)";
+  if (m.wraparoundPct >= 80) pct.classList.add("warn-text");
+  line.append(pct);
+  wrap.append(line);
+
+  renderTableAges(m.oldestTables);
+  renderLongTx(m.longTx);
+  renderVacuum(m.needVacuum);
+  renderSequences(m.sequences);
+}
+
+function renderTableAges(tables) {
+  const box = el("maint-oldest");
+  box.replaceChildren();
+  if (tables.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No table statistics available.";
+    box.append(note);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "scans";
+  const head = table.insertRow();
+  for (const h of ["Oldest tables", "Transactions since freeze", "Of threshold", "Size"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (h !== "Oldest tables") th.className = "num";
+    head.append(th);
+  }
+  for (const t of tables) {
+    const row = table.insertRow();
+    const cells = [
+      t.schema + "." + t.table,
+      t.age.toLocaleString(),
+      t.pct + "%",
+      t.size,
+    ];
+    cells.forEach((text, i) => {
+      const td = row.insertCell();
+      td.textContent = text;
+      if (i > 0) td.className = "num";
+      if (i === 2 && t.pct >= 80) td.classList.add("warn-text");
+    });
+  }
+  box.append(table);
+}
+
+function renderLongTx(list) {
+  const box = el("maint-longtx");
+  box.replaceChildren();
+  if (list.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No transaction has been open for more than a minute.";
+    box.append(note);
+    return;
+  }
+
+  for (const t of list) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    const title = document.createElement("div");
+    title.className = "conn-title";
+    title.textContent = "pid " + t.pid + " open for " + ago(t.xactSeconds).replace(" ago", "");
+    cell.append(title);
+
+    const meta = document.createElement("div");
+    meta.className = "idx-meta";
+    const st = document.createElement("span");
+    st.textContent = t.state;
+    if (t.state.startsWith("idle in transaction")) st.classList.add("warn-text");
+    meta.append(st);
+    if (t.user) {
+      const who = document.createElement("span");
+      who.textContent = t.user + (t.app ? " · " + t.app : "");
+      meta.append(who);
+    }
+    cell.append(meta);
+
+    const q = document.createElement("div");
+    q.className = "sql-text";
+    q.textContent = t.query || "(no query text)";
+    cell.append(q);
+
+    cell.append(txActions(t));
+    box.append(cell);
+  }
+}
+
+function txActions(t) {
+  const key = maintConfirming ? maintConfirming.split(":") : null;
+  if (key && (key[0] === "cancel" || key[0] === "terminate") &&
+      Number(key[1]) === t.pid) {
+    const terminate = key[0] === "terminate";
+    const wrap = document.createElement("div");
+    const q = document.createElement("div");
+    q.textContent = terminate
+      ? "Terminate connection " + t.pid + "? Its transaction is rolled back " +
+        "and the client is disconnected."
+      : "Cancel the running query of pid " + t.pid + "? The transaction stays " +
+        "open, so it keeps holding back vacuum until COMMIT or ROLLBACK.";
+    const stmt = document.createElement("div");
+    stmt.className = "sql-text";
+    stmt.textContent = terminate ? t.terminateSQL : t.cancelSQL;
+    const act = button(terminate ? "Terminate connection" : "Cancel query",
+      () => runMaintSignal(t, terminate));
+    act.classList.add("destructive");
+    wrap.append(q, stmt, buttonRow(
+      button("Cancel", () => {
+        maintConfirming = null;
+        renderMaintenance();
+      }),
+      act,
+    ));
+    return wrap;
+  }
+
+  const copy = button("Copy SQL", async () => {
+    await navigator.clipboard.writeText(t.cancelSQL + "\n" + t.terminateSQL);
+  });
+  const cancelBtn = button("Cancel query...", () => {
+    maintConfirming = "cancel:" + t.pid;
+    renderMaintenance();
+  });
+  cancelBtn.classList.add("destructive");
+  const termBtn = button("Terminate...", () => {
+    maintConfirming = "terminate:" + t.pid;
+    renderMaintenance();
+  });
+  termBtn.classList.add("destructive");
+  return buttonRow(copy, cancelBtn, termBtn);
+}
+
+async function runMaintSignal(t, terminate) {
+  maintConfirming = null;
+  try {
+    await window.signalBackend(t.pid, terminate);
+  } catch (err) {
+    el("maint-status").textContent = String(err);
+    return;
+  }
+  loadMaintenance();
+}
+
+function renderVacuum(list) {
+  const box = el("maint-vacuum");
+  box.replaceChildren();
+  if (list.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No table is carrying a meaningful number of dead rows.";
+    box.append(note);
+    return;
+  }
+
+  for (const t of list) {
+    const key = t.schema + "." + t.table;
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    if (maintConfirming === "vacuum:" + key) {
+      const q = document.createElement("div");
+      q.textContent = "Run vacuum on " + key + "?";
+      const stmt = document.createElement("div");
+      stmt.className = "sql-text";
+      stmt.textContent = t.vacuumSQL;
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = "Reclaims dead rows and refreshes planner " +
+        "statistics. Reads and writes keep working, but on a large table " +
+        "this can run for a long time.";
+      cell.append(q, stmt, hint, buttonRow(
+        button("Cancel", () => {
+          maintConfirming = null;
+          renderMaintenance();
+        }),
+        button("Run vacuum", () => runVacuumTable(t)),
+      ));
+      box.append(cell);
+      continue;
+    }
+
+    const title = document.createElement("div");
+    title.className = "conn-title";
+    title.textContent = key;
+    const meta = document.createElement("div");
+    meta.className = "idx-meta";
+    const dead = document.createElement("span");
+    dead.textContent = t.deadRows.toLocaleString() + " dead rows (" +
+      t.deadPct + "%)";
+    if (t.deadPct >= 20) dead.classList.add("warn-text");
+    const live = document.createElement("span");
+    live.textContent = t.liveRows.toLocaleString() + " live";
+    const size = document.createElement("span");
+    size.textContent = t.size;
+    const vac = document.createElement("span");
+    vac.textContent = "vacuum " + ago(t.vacuumAgo);
+    if (t.vacuumAgo < 0) vac.classList.add("warn-text");
+    const ana = document.createElement("span");
+    ana.textContent = "analyze " + ago(t.analyzeAgo);
+    meta.append(dead, live, size, vac, ana);
+
+    const copy = button("Copy SQL", async () => {
+      await navigator.clipboard.writeText(t.vacuumSQL);
+    });
+    const run = button("Run vacuum...", () => {
+      maintConfirming = "vacuum:" + key;
+      renderMaintenance();
+    });
+
+    cell.append(title, meta, buttonRow(copy, run));
+    box.append(cell);
+  }
+}
+
+async function runVacuumTable(t) {
+  maintConfirming = null;
+  el("maint-status").textContent = "Running vacuum on " + t.schema + "." +
+    t.table + "; this can take a while...";
+  try {
+    maint = await window.vacuumTable(t.schema, t.table);
+  } catch (err) {
+    el("maint-status").textContent = String(err);
+    return;
+  }
+  renderMaintenance();
+}
+
+function renderSequences(list) {
+  const box = el("maint-sequences");
+  box.replaceChildren();
+  if (list.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No sequence has been used yet.";
+    box.append(note);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "scans";
+  const head = table.insertRow();
+  for (const h of ["Sequence", "Last value", "Maximum", "Spent"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (h !== "Sequence") th.className = "num";
+    head.append(th);
+  }
+  for (const s of list) {
+    const row = table.insertRow();
+    const cells = [
+      s.schema + "." + s.name,
+      s.lastValue.toLocaleString(),
+      s.maxValue.toLocaleString(),
+      s.pct + "%",
+    ];
+    cells.forEach((text, i) => {
+      const td = row.insertCell();
+      td.textContent = text;
+      if (i > 0) td.className = "num";
+      if (i === 3 && s.pct >= 70) td.classList.add("warn-text");
+    });
+  }
+  box.append(table);
+}
+
+el("maint-btn").addEventListener("click", () => {
+  maintOpen = true;
+  render();
+  loadMaintenance();
+});
+el("maint-back").addEventListener("click", () => {
+  maintOpen = false;
+  render();
+});
+el("maint-refresh").addEventListener("click", loadMaintenance);
+
 el("ext-badge").addEventListener("click", () => {
   el("ext-tip").hidden = !el("ext-tip").hidden;
 });
@@ -960,6 +1279,7 @@ el("add").prepend(icon("plus-lg"));
 el("delete").prepend(icon("trash"));
 el("back").prepend(icon("arrow-left"));
 el("idx-back").prepend(icon("arrow-left"));
+el("maint-back").prepend(icon("arrow-left"));
 el("connections-btn").prepend(icon("gear"));
 el("ext-badge").append(icon("warn"));
 

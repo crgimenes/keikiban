@@ -266,6 +266,7 @@
         <button type="button" id="pause" class="icon-only"
           aria-label="Pause auto-refresh" title="Pause auto-refresh"></button>
         <button type="button" id="indexes-btn">Indexes</button>
+        <button type="button" id="maint-btn">Maintenance</button>
         <button type="button" id="connections-btn">Connections</button>
       </div>
     </div>
@@ -347,6 +348,41 @@
       index or stale planner statistics. Cumulative numbers, read with the
       stats age above in mind.</p>
     <div id="idx-seqscans"></div>
+  </section>
+
+  <section id="maintenance" hidden>
+    <div class="dash-header">
+      <h2>Maintenance</h2>
+      <div class="buttons dash-actions">
+        <button type="button" id="maint-refresh">Refresh</button>
+        <button type="button" id="maint-back">Back</button>
+      </div>
+    </div>
+    <p id="maint-status" class="hint" aria-live="polite"></p>
+
+    <h3>Transaction ID wraparound</h3>
+    <p class="hint">PostgreSQL shuts down writes if transaction IDs are ever
+      exhausted. Autovacuum normally freezes rows well before that; this is
+      how close the database is to the freeze threshold.</p>
+    <p id="maint-wraparound"></p>
+    <div id="maint-oldest"></div>
+
+    <h3>Long-running transactions</h3>
+    <p class="hint">A transaction open for a long time keeps its locks and
+      stops vacuum from cleaning dead rows anywhere in the database. Idle in
+      transaction is the dangerous one: nothing is running, yet everything
+      waits.</p>
+    <div id="maint-longtx"></div>
+
+    <h3>Dead rows</h3>
+    <p class="hint">Rows already deleted or replaced, still occupying space
+      until vacuum reclaims them. Estimates from the statistics collector.</p>
+    <div id="maint-vacuum"></div>
+
+    <h3>Sequences</h3>
+    <p class="hint">How much of each sequence range is spent. An integer
+      column overflowing its sequence stops inserts.</p>
+    <div id="maint-sequences"></div>
   </section>
 
   <section id="list" hidden>

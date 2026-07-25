@@ -109,10 +109,24 @@ func runJSON(cfg Config, configErr string, args []string) {
 			os.Exit(1)
 		}
 		_ = enc.Encode(map[string]any{"blocking": tree})
+	case "maintenance":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		report := collectMaintenance(context.Background(), cfg.Connections[0].URL)
+		_ = enc.Encode(report)
+		if report.Error != "" {
+			os.Exit(1)
+		}
 	default:
 		_ = enc.Encode(map[string]any{
 			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections", "indexes", "locks"},
+			"commands": []string{"connections", "indexes", "locks", "maintenance"},
 		})
 		os.Exit(1)
 	}
@@ -278,6 +292,40 @@ func runGUI(cfg Config, configErr string) {
 		dbURL := cfg.Connections[0].URL
 		mu.Unlock()
 		return cancelBackend(context.Background(), dbURL, pid, terminate)
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("maintenanceReport", func() (maintenanceReport, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			report := emptyMaintenanceReport()
+			report.Error = "no connections configured"
+			return report, nil
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		return collectMaintenance(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("vacuumTable", func(schema, table string) (maintenanceReport, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			return maintenanceReport{}, fmt.Errorf("no connections configured")
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		err := runVacuum(context.Background(), dbURL, schema, table)
+		if err != nil {
+			return maintenanceReport{}, err
+		}
+		return collectMaintenance(context.Background(), dbURL), nil
 	})
 	if err != nil {
 		log.Fatal(err)
