@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>keikiban</title>
+  <style>
+    /* Let the OS webview do the styling: native controls, native colors,
+       native dark mode. Only layout lives here. Everything is sized in rem
+       so the keyboard zoom (Cmd+/Cmd-) scales the whole page. */
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1.25rem;
+    }
+    h1 { font-size: 1.3rem; margin-top: 0; }
+    h2 { font-size: 1.05rem; }
+    label { display: block; margin-top: 0.8rem; }
+    input[type="text"] {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 0.25rem;
+      font-size: 1rem;
+    }
+    button {
+      font: inherit;
+      padding: 0.3rem 1.1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    svg.icon { width: 1em; height: 1em; flex-shrink: 0; }
+    /* Destructive actions read red in both themes; the icon follows via
+       currentColor. */
+    button.destructive { color: light-dark(#b3261e, #ff7369); }
+    /* Delete lives apart from the safe actions in the same row. */
+    #delete { margin-right: auto; }
+    button.icon-only { padding: 0.3rem 0.55rem; }
+    /* Buttons anchor to the right edge and follow it on resize. */
+    .buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+    .hint { font-size: 0.85rem; opacity: 0.75; }
+    #result { white-space: pre-wrap; word-break: break-word; }
+    #config-error { white-space: pre-wrap; word-break: break-word; }
+    .cell {
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 0.4rem;
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 0.6rem;
+    }
+    .cell .buttons { margin-top: 0.5rem; }
+    .conn-title { font-weight: 600; }
+    .conn-default {
+      font-weight: normal;
+      font-size: 0.8rem;
+      opacity: 0.75;
+      margin-left: 0.5rem;
+    }
+    .conn-url { font-size: 0.85rem; opacity: 0.75; word-break: break-all; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>keikiban</h1>
+
+  <section id="config-error-box" hidden>
+    <h2>Configuration error</h2>
+    <p>The config file could not be loaded. Fix it and reopen keikiban.</p>
+    <p><code id="config-error"></code></p>
+  </section>
+
+  <section id="setup" hidden>
+    <h2 id="setup-heading">Add a PostgreSQL connection</h2>
+    <p id="first-run-note" hidden>
+      No connections configured yet. Add the first one to get started.
+    </p>
+    <form id="setup-form">
+      <label>Connection URL
+        <input type="text" id="url" autocomplete="off" spellcheck="false"
+          placeholder="postgres://user:password@host:5432/dbname">
+      </label>
+      <p class="hint">URL form or key=value form (host=... dbname=...) both work.</p>
+      <label>Title (optional)
+        <input type="text" id="title" autocomplete="off"
+          placeholder="Production, Local dev, ...">
+      </label>
+      <div class="buttons">
+        <button type="button" id="delete" class="destructive" hidden>Delete</button>
+        <button type="button" id="test">Test connection</button>
+        <button type="submit" id="save">Save</button>
+        <button type="button" id="cancel" hidden>Cancel</button>
+      </div>
+    </form>
+    <div id="confirm" hidden>
+      <p id="confirm-text"></p>
+      <p class="hint">Only its (database ...) line is removed; the rest of the
+        file is untouched.</p>
+      <div class="buttons">
+        <button type="button" id="confirm-cancel">Cancel</button>
+        <button type="button" id="confirm-remove" class="destructive">Remove</button>
+      </div>
+    </div>
+    <p id="result" aria-live="polite"></p>
+    <p class="hint">Connections are saved to <code id="cfg-path"></code>.
+      The file is yours: keikiban only appends to it, never rewrites it.</p>
+  </section>
+
+  <section id="list" hidden>
+    <h2>Connections</h2>
+    <div id="connections"></div>
+    <div class="buttons">
+      <button type="button" id="add">Add connection</button>
+    </div>
+    <p class="hint">The first connection is the default: it will load the
+      dashboard when keikiban opens. Dashboard screens are under
+      construction.</p>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
