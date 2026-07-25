@@ -148,6 +148,32 @@
       background: rgba(127, 127, 127, 0.15);
     }
     .sql-bar span { height: 100%; }
+
+    /* Index health */
+    #indexes h3 { margin-bottom: 0.2rem; }
+    #indexes h3 + .hint { margin-top: 0; }
+    .idx-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      opacity: 0.85;
+    }
+    .warn-text { color: light-dark(#b58900, #ffd54f); }
+    table.scans {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.9rem;
+    }
+    table.scans th, table.scans td {
+      text-align: left;
+      padding: 0.3rem 0.8rem 0.3rem 0;
+      border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+    }
+    table.scans td.num, table.scans th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
     /* Buttons anchor to the right edge and follow it on resize. */
     .buttons {
       margin-top: 1rem;
@@ -231,6 +257,7 @@
         </span>
         <button type="button" id="pause" class="icon-only"
           aria-label="Pause auto-refresh" title="Pause auto-refresh"></button>
+        <button type="button" id="indexes-btn">Indexes</button>
         <button type="button" id="connections-btn">Connections</button>
       </div>
     </div>
@@ -270,6 +297,40 @@
     <h2>Top SQL <span class="hint">by share of active sessions in this
       window</span></h2>
     <div id="topsql"></div>
+  </section>
+
+  <section id="indexes" hidden>
+    <div class="dash-header">
+      <h2>Index health</h2>
+      <div class="buttons dash-actions">
+        <button type="button" id="idx-refresh">Refresh</button>
+        <button type="button" id="idx-back">Back</button>
+      </div>
+    </div>
+    <p id="idx-status" class="hint" aria-live="polite"></p>
+    <p id="idx-summary"></p>
+
+    <h3>Invalid indexes</h3>
+    <p class="hint">Leftovers of a failed CREATE INDEX CONCURRENTLY: they are
+      maintained on every write but never used. Safe to drop, then recreate
+      if still wanted.</p>
+    <div id="idx-invalid"></div>
+
+    <h3>Duplicate indexes</h3>
+    <p class="hint">Column list equal to, or a leading prefix of, another
+      index on the same table. The wider index already serves these queries.
+      Verify before dropping: opclass or ordering differences can matter.</p>
+    <div id="idx-duplicates"></div>
+
+    <h3>Unused indexes</h3>
+    <p id="idx-unused-note" class="hint"></p>
+    <div id="idx-unused"></div>
+
+    <h3>Tables scanned sequentially</h3>
+    <p class="hint">Large tables where sequential scans dominate: a missing
+      index or stale planner statistics. Cumulative numbers, read with the
+      stats age above in mind.</p>
+    <div id="idx-seqscans"></div>
   </section>
 
   <section id="list" hidden>

@@ -80,10 +80,24 @@ func runJSON(cfg Config, configErr string, args []string) {
 			cfg.Connections = []Connection{}
 		}
 		_ = enc.Encode(cfg)
+	case "indexes":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		report := collectIndexReport(context.Background(), cfg.Connections[0].URL)
+		_ = enc.Encode(report)
+		if report.Error != "" {
+			os.Exit(1)
+		}
 	default:
 		_ = enc.Encode(map[string]any{
 			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections"},
+			"commands": []string{"connections", "indexes"},
 		})
 		os.Exit(1)
 	}
@@ -214,6 +228,40 @@ func runGUI(cfg Config, configErr string) {
 	err = w.Bind("logError", func(msg string) error {
 		debugf("event=ui_error msg=%q", msg)
 		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("indexReport", func() (indexReport, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			report := emptyIndexReport()
+			report.Error = "no connections configured"
+			return report, nil
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		return collectIndexReport(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("dropIndex", func(schema, name string) (indexReport, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			return indexReport{}, fmt.Errorf("no connections configured")
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		err := dropIndex(context.Background(), dbURL, schema, name)
+		if err != nil {
+			return indexReport{}, err
+		}
+		return collectIndexReport(context.Background(), dbURL), nil
 	})
 	if err != nil {
 		log.Fatal(err)

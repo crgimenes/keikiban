@@ -68,6 +68,8 @@ let state = { path: "", exists: false, error: "", connections: [] };
 let editingIndex = null;
 // listOpen: the connections editor is open on top of the dashboard.
 let listOpen = false;
+// indexesOpen: the index-health screen is open on top of the dashboard.
+let indexesOpen = false;
 
 const WINDOW_KEY = "keikiban.window";
 let windowSeconds = Number(localStorage.getItem(WINDOW_KEY)) || 300;
@@ -157,7 +159,8 @@ function render() {
     editingIndex >= 0 ? "Edit connection" : "Add a PostgreSQL connection";
   el("list").hidden = formOpen || !listOpen;
   el("back").hidden = false;
-  el("dashboard").hidden = formOpen || listOpen;
+  el("indexes").hidden = formOpen || listOpen || !indexesOpen;
+  el("dashboard").hidden = formOpen || listOpen || indexesOpen;
 
   const box = el("connections");
   box.replaceChildren();
@@ -580,6 +583,201 @@ el("back").addEventListener("click", () => {
   render();
 });
 
+// --- Index health screen ---
+
+let idxReport = null;
+// idxConfirming: "schema.name" of the entry showing the drop confirmation.
+let idxConfirming = null;
+
+async function loadIndexes() {
+  el("idx-status").textContent = "Collecting index statistics...";
+  try {
+    idxReport = await window.indexReport();
+  } catch (err) {
+    el("idx-status").textContent = String(err);
+    return;
+  }
+  renderIndexes();
+}
+
+function renderIndexes() {
+  const r = idxReport;
+  if (!r) return;
+  el("idx-status").textContent = r.error || "";
+
+  const summary = el("idx-summary");
+  summary.replaceChildren();
+  if (!r.error) {
+    const cache = document.createElement("span");
+    cache.className = "idx-meta";
+    const idxHit = document.createElement("span");
+    idxHit.textContent = "index cache hit: " + r.indexCacheHitPct + "%";
+    if (r.indexCacheHitPct < 95) idxHit.classList.add("warn-text");
+    const tblHit = document.createElement("span");
+    tblHit.textContent = "table cache hit: " + r.tableCacheHitPct + "%";
+    if (r.tableCacheHitPct < 95) tblHit.classList.add("warn-text");
+    const reset = document.createElement("span");
+    reset.textContent = r.statsReset
+      ? "statistics since " + r.statsReset
+      : "statistics never reset";
+    cache.append(idxHit, tblHit, reset);
+    summary.append(cache);
+  }
+
+  el("idx-unused-note").textContent =
+    "Never scanned since the statistics started, ordered by size. " +
+    "Primary keys are excluded; unique indexes may still enforce " +
+    "constraints even when never scanned." +
+    (r.unusedTruncated ? " Showing the " + r.unused.length + " largest." : "");
+
+  renderIndexList("idx-invalid", r.invalid, "No invalid indexes.");
+  renderIndexList("idx-duplicates", r.duplicates, "No duplicate indexes.");
+  renderIndexList("idx-unused", r.unused, "No unused indexes.");
+  renderSeqScans(r.seqScans);
+}
+
+function indexCell(e) {
+  const key = e.schema + "." + e.name;
+  const cell = document.createElement("div");
+  cell.className = "cell";
+
+  if (idxConfirming === key) {
+    const q = document.createElement("div");
+    q.textContent = 'Drop index "' + e.name + '" on ' +
+      e.schema + "." + e.table + " (" + e.size + ")?";
+    const ddl = document.createElement("div");
+    ddl.className = "sql-text";
+    ddl.textContent = e.dropDDL;
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Runs exactly the statement above. CONCURRENTLY does " +
+      "not block writes, but can take a while on a big index.";
+    const drop = button("Drop index", () => runDropIndex(e));
+    drop.classList.add("destructive");
+    cell.append(q, ddl, hint, buttonRow(
+      button("Cancel", () => {
+        idxConfirming = null;
+        renderIndexes();
+      }),
+      drop,
+    ));
+    return cell;
+  }
+
+  const title = document.createElement("div");
+  title.className = "conn-title";
+  title.textContent = e.schema + "." + e.table + " . " + e.name;
+
+  const meta = document.createElement("div");
+  meta.className = "idx-meta";
+  const size = document.createElement("span");
+  size.textContent = e.size;
+  meta.append(size);
+  const scans = document.createElement("span");
+  scans.textContent = e.scans + " scans";
+  meta.append(scans);
+  if (e.unique) {
+    const uq = document.createElement("span");
+    uq.className = "warn-text";
+    uq.textContent = "unique: may enforce a constraint";
+    meta.append(uq);
+  }
+  if (e.coveredBy) {
+    const cov = document.createElement("span");
+    cov.textContent = "covered by " + e.coveredBy;
+    meta.append(cov);
+  }
+
+  const def = document.createElement("div");
+  def.className = "sql-text";
+  def.textContent = e.definition;
+
+  const copy = button("Copy DDL", async () => {
+    await navigator.clipboard.writeText(e.dropDDL);
+  });
+  const drop = button("Drop index...", () => {
+    idxConfirming = key;
+    renderIndexes();
+  }, "trash");
+  drop.classList.add("destructive");
+
+  cell.append(title, meta, def, buttonRow(copy, drop));
+  return cell;
+}
+
+function renderIndexList(id, entries, emptyText) {
+  const box = el(id);
+  box.replaceChildren();
+  if (entries.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = emptyText;
+    box.append(note);
+    return;
+  }
+  for (const e of entries) box.append(indexCell(e));
+}
+
+function renderSeqScans(tables) {
+  const box = el("idx-seqscans");
+  box.replaceChildren();
+  if (tables.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No large tables dominated by sequential scans.";
+    box.append(note);
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "scans";
+  const head = table.insertRow();
+  for (const h of ["Table", "Seq scans", "Index scans", "Index use", "Live rows"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    if (h !== "Table") th.className = "num";
+    head.append(th);
+  }
+  for (const t of tables) {
+    const row = table.insertRow();
+    const cells = [
+      t.schema + "." + t.table,
+      String(t.seqScans),
+      String(t.idxScans),
+      t.indexUsePct + "%",
+      String(t.liveRows),
+    ];
+    cells.forEach((text, i) => {
+      const td = row.insertCell();
+      td.textContent = text;
+      if (i > 0) td.className = "num";
+    });
+  }
+  box.append(table);
+}
+
+async function runDropIndex(e) {
+  el("idx-status").textContent = "Dropping " + e.name + "...";
+  idxConfirming = null;
+  try {
+    idxReport = await window.dropIndex(e.schema, e.name);
+  } catch (err) {
+    el("idx-status").textContent = "Could not drop: " + err;
+    return;
+  }
+  renderIndexes();
+}
+
+el("indexes-btn").addEventListener("click", () => {
+  indexesOpen = true;
+  render();
+  loadIndexes();
+});
+el("idx-back").addEventListener("click", () => {
+  indexesOpen = false;
+  render();
+});
+el("idx-refresh").addEventListener("click", loadIndexes);
+
 el("ext-badge").addEventListener("click", () => {
   el("ext-tip").hidden = !el("ext-tip").hidden;
 });
@@ -612,6 +810,7 @@ el("test").prepend(icon("plug"));
 el("add").prepend(icon("plus-lg"));
 el("delete").prepend(icon("trash"));
 el("back").prepend(icon("arrow-left"));
+el("idx-back").prepend(icon("arrow-left"));
 el("connections-btn").prepend(icon("gear"));
 el("ext-badge").append(icon("warn"));
 
