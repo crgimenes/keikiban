@@ -205,6 +205,8 @@ func runGUI(cfg Config, configErr string) {
 				Conns:            []bucketOut{},
 				TPSClasses:       []string{},
 				TPS:              []bucketOut{},
+				CacheClasses:     []string{},
+				CacheHit:         []bucketOut{},
 			}, nil
 		}
 		out := sampler.Snapshot(time.Now(), windowSeconds)

@@ -21,6 +21,7 @@ const (
 	chartClassLimit = 10
 	topSQLLimit     = 10
 	maxQueryRunes   = 300
+	pgssEvery       = 10 // pg_stat_statements snapshot every N samples
 )
 
 // requiredExtensions enrich the dashboard but are optional; when absent the
@@ -29,8 +30,9 @@ var requiredExtensions = []string{"pg_stat_statements"}
 
 // activeRow is one active session captured in a sample.
 type activeRow struct {
-	class string // wait event key (waitKey), or CPU when not waiting
-	query string
+	class   string // wait event key (waitKey), or CPU when not waiting
+	query   string
+	queryID int64 // pg_stat_activity.query_id (PG14+), 0 when unavailable
 }
 
 // sample is one capture of pg_stat_activity plus the cluster counters taken
@@ -47,6 +49,23 @@ type sample struct {
 	commitsPS   float64
 	rollbacksPS float64
 	ratesValid  bool
+
+	cacheHitPct float64
+	cacheValid  bool
+}
+
+// pgssSnap is one periodic capture of pg_stat_statements counters, keyed by
+// queryid; window deltas between two snaps become calls/s, rows/call and
+// ms/call for the Top SQL table.
+type pgssSnap struct {
+	at    time.Time
+	stats map[int64]pgssStat
+}
+
+type pgssStat struct {
+	calls   int64
+	rows    int64
+	totalMS float64
 }
 
 // Sampler keeps a sliding in-memory window of activity samples for one
@@ -62,10 +81,15 @@ type Sampler struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
 
-	// previous cumulative counters, for the per-second transaction rates.
+	pgss []pgssSnap
+
+	// previous cumulative counters, for the per-second rates. Touched only by
+	// the sampling goroutine.
 	prevAt        time.Time
 	prevCommits   int64
 	prevRollbacks int64
+	prevBlksRead  int64
+	prevBlksHit   int64
 	prevValid     bool
 }
 
@@ -143,8 +167,20 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 	debugf("event=sampler_connected missing_extensions=%q preloaded=%q max_connections=%d",
 		strings.Join(missing, ","), strings.Join(preloaded, ","), maxConns)
 
+	// pg_stat_activity.query_id needs PG14+; older servers sample without it.
+	version, err := serverVersionNum(ctx, conn)
+	if err != nil {
+		return err
+	}
+	activityQuery := sqlActivity
+	if version < 140000 {
+		activityQuery = sqlActivityNoQueryID
+	}
+	pgssAvailable := len(missing) == 0
+
 	ticker := time.NewTicker(sampleEvery)
 	defer ticker.Stop()
+	tick := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -152,7 +188,7 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 		case <-ticker.C:
 		}
 
-		smp, err := sampleActivity(ctx, conn)
+		smp, err := sampleActivity(ctx, conn, activityQuery)
 		if err != nil {
 			return err
 		}
@@ -164,7 +200,76 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 			debugf("event=sample active=%d", len(smp.rows))
 		}
 		s.push(smp)
+
+		tick++
+		if pgssAvailable && tick%pgssEvery == 0 {
+			err = s.samplePGSS(ctx, conn)
+			if err != nil {
+				return err
+			}
+		}
 	}
+}
+
+func serverVersionNum(ctx context.Context, conn *pgx.Conn) (int, error) {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	v := 0
+	err := conn.QueryRow(qctx,
+		`SELECT current_setting('server_version_num')::int;`).Scan(&v)
+	return v, err
+}
+
+// samplePGSS captures the heaviest pg_stat_statements rows. The full view can
+// hold thousands of entries; the top by total time is what the ranking needs.
+func (s *Sampler) samplePGSS(ctx context.Context, conn *pgx.Conn) error {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	rows, err := conn.Query(qctx, `SELECT
+			queryid,        -- 1
+			calls,          -- 2
+			rows,           -- 3
+			total_exec_time -- 4
+		FROM pg_stat_statements
+		WHERE queryid IS NOT NULL
+		ORDER BY total_exec_time DESC
+		LIMIT 500;`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	snap := pgssSnap{at: time.Now(), stats: map[int64]pgssStat{}}
+	for rows.Next() {
+		var id int64
+		var st pgssStat
+		err = rows.Scan(
+			&id,         // 1
+			&st.calls,   // 2
+			&st.rows,    // 3
+			&st.totalMS, // 4
+		)
+		if err != nil {
+			return err
+		}
+		snap.stats[id] = st
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+
+	s.mu.Lock()
+	s.pgss = append(s.pgss, snap)
+	cutoff := snap.at.Add(-sampleKeep)
+	first := 0
+	for first < len(s.pgss) && s.pgss[first].at.Before(cutoff) {
+		first++
+	}
+	s.pgss = s.pgss[first:]
+	s.mu.Unlock()
+	return nil
 }
 
 // sampleCounters fills smp with the transaction rates derived from the
@@ -174,13 +279,17 @@ func (s *Sampler) sampleCounters(ctx context.Context, conn *pgx.Conn, smp *sampl
 	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
 	defer cancel()
 
-	var commits, rollbacks int64
+	var commits, rollbacks, blksRead, blksHit int64
 	err := conn.QueryRow(qctx, `SELECT
-			COALESCE(sum(xact_commit), 0)::bigint,  -- 1
-			COALESCE(sum(xact_rollback), 0)::bigint -- 2
+			COALESCE(sum(xact_commit), 0)::bigint,   -- 1
+			COALESCE(sum(xact_rollback), 0)::bigint, -- 2
+			COALESCE(sum(blks_read), 0)::bigint,     -- 3
+			COALESCE(sum(blks_hit), 0)::bigint       -- 4
 		FROM pg_stat_database;`).Scan(
 		&commits,   // 1
 		&rollbacks, // 2
+		&blksRead,  // 3
+		&blksHit,   // 4
 	)
 	if err != nil {
 		return err
@@ -192,9 +301,17 @@ func (s *Sampler) sampleCounters(ctx context.Context, conn *pgx.Conn, smp *sampl
 		smp.rollbacksPS = round2(float64(rollbacks-s.prevRollbacks) / dt)
 		smp.ratesValid = true
 	}
+	dRead := blksRead - s.prevBlksRead
+	dHit := blksHit - s.prevBlksHit
+	if s.prevValid && dRead >= 0 && dHit >= 0 && dRead+dHit > 0 {
+		smp.cacheHitPct = round2(100 * float64(dHit) / float64(dHit+dRead))
+		smp.cacheValid = true
+	}
 	s.prevAt = smp.at
 	s.prevCommits = commits
 	s.prevRollbacks = rollbacks
+	s.prevBlksRead = blksRead
+	s.prevBlksHit = blksHit
 	s.prevValid = true
 	return nil
 }
@@ -221,7 +338,20 @@ const sqlActivity = `SELECT
 		COALESCE(wait_event_type, ''), -- 2
 		COALESCE(wait_event, ''),      -- 3
 		COALESCE(query, ''),           -- 4
-		backend_type                   -- 5
+		backend_type,                  -- 5
+		COALESCE(query_id, 0)          -- 6
+	FROM pg_stat_activity
+	WHERE pid <> pg_backend_pid()
+	AND backend_type IN ('client backend', 'parallel worker');`
+
+// sqlActivityNoQueryID is the PG13-and-older variant: no query_id column.
+const sqlActivityNoQueryID = `SELECT
+		COALESCE(state, ''),           -- 1
+		COALESCE(wait_event_type, ''), -- 2
+		COALESCE(wait_event, ''),      -- 3
+		COALESCE(query, ''),           -- 4
+		backend_type,                  -- 5
+		0::bigint                      -- 6 (query_id placeholder)
 	FROM pg_stat_activity
 	WHERE pid <> pg_backend_pid()
 	AND backend_type IN ('client backend', 'parallel worker');`
@@ -229,25 +359,27 @@ const sqlActivity = `SELECT
 // sampleActivity captures one second of pg_stat_activity: the active sessions
 // feed the load chart, and every client backend is counted by state for the
 // connections chart.
-func sampleActivity(ctx context.Context, conn *pgx.Conn) (sample, error) {
+func sampleActivity(ctx context.Context, conn *pgx.Conn, query string) (sample, error) {
 	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
 	defer cancel()
 
 	smp := sample{at: time.Now()}
-	rows, err := conn.Query(qctx, sqlActivity)
+	rows, err := conn.Query(qctx, query)
 	if err != nil {
 		return smp, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var state, typ, event, query, backend string
+		var state, typ, event, queryText, backend string
+		var queryID int64
 		err = rows.Scan(
-			&state,   // 1
-			&typ,     // 2
-			&event,   // 3
-			&query,   // 4
-			&backend, // 5
+			&state,     // 1
+			&typ,       // 2
+			&event,     // 3
+			&queryText, // 4
+			&backend,   // 5
+			&queryID,   // 6
 		)
 		if err != nil {
 			return smp, err
@@ -255,8 +387,9 @@ func sampleActivity(ctx context.Context, conn *pgx.Conn) (sample, error) {
 
 		if state == "active" {
 			smp.rows = append(smp.rows, activeRow{
-				class: waitKey(typ, event),
-				query: query,
+				class:   waitKey(typ, event),
+				query:   queryText,
+				queryID: queryID,
 			})
 		}
 		if backend != "client backend" {
@@ -365,6 +498,15 @@ type topSQLOut struct {
 	AAS     float64            `json:"aas"`
 	Pct     float64            `json:"pct"`
 	ByClass map[string]float64 `json:"byClass"`
+
+	// pg_stat_statements enrichment over the visible window; HasStats is
+	// false when the extension is missing or the query was not matched.
+	HasStats    bool    `json:"hasStats"`
+	CallsPS     float64 `json:"callsPS"`
+	RowsPerCall float64 `json:"rowsPerCall"`
+	MSPerCall   float64 `json:"msPerCall"`
+
+	queryID int64
 }
 
 // dashOut is the dashboard snapshot handed to the UI (and, later, to the IPC
@@ -393,13 +535,16 @@ type dashOut struct {
 	MaxConnections int         `json:"maxConnections"`
 	TPSClasses     []string    `json:"tpsClasses"`
 	TPS            []bucketOut `json:"tps"`
+	CacheClasses   []string    `json:"cacheClasses"`
+	CacheHit       []bucketOut `json:"cacheHit"`
 }
 
 // Connection-state and transaction-rate series share fixed class names; the
 // UI maps them to fixed colors.
 var (
-	connClasses = []string{"active", "idle in transaction", "idle", "other"}
-	tpsClasses  = []string{"commits/s", "rollbacks/s"}
+	connClasses  = []string{"active", "idle in transaction", "idle", "other"}
+	tpsClasses   = []string{"commits/s", "rollbacks/s"}
+	cacheClasses = []string{"cache hit %"}
 )
 
 // Snapshot aggregates the sliding window ending now into chart buckets and a
@@ -410,9 +555,11 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 	status := s.status
 	missing := s.missing
 	preloaded := s.preloaded
+	pgss := s.pgss
 	s.mu.Unlock()
 
 	out := aggregate(samples, now, windowSeconds)
+	enrichTopSQL(out.TopSQL, pgss, now.Add(-time.Duration(out.WindowSeconds)*time.Second))
 	out.Connected = status == "sampling"
 	out.Status = status
 	out.Missing = missing
@@ -451,6 +598,8 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		conns   [4]int     // sums by connClasses order
 		rates   [2]float64 // sums by tpsClasses order
 		rateN   int
+		cache   float64
+		cacheN  int
 	}
 	buckets := make([]agg, chartBuckets)
 	for i := range buckets {
@@ -460,6 +609,7 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 	classSeen := map[string]bool{}
 	queryCount := map[string]int{}
 	queryByClass := map[string]map[string]int{}
+	queryIDOf := map[string]int64{}
 	totalSamples := 0
 	totalRows := 0
 
@@ -482,6 +632,10 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 			buckets[idx].rates[1] += smp.rollbacksPS
 			buckets[idx].rateN++
 		}
+		if smp.cacheValid {
+			buckets[idx].cache += smp.cacheHitPct
+			buckets[idx].cacheN++
+		}
 		for _, row := range smp.rows {
 			buckets[idx].count[row.class]++
 			classSeen[row.class] = true
@@ -495,6 +649,9 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 				queryByClass[q] = map[string]int{}
 			}
 			queryByClass[q][row.class]++
+			if row.queryID != 0 {
+				queryIDOf[q] = row.queryID
+			}
 		}
 	}
 
@@ -561,12 +718,17 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 	outBuckets := make([]bucketOut, chartBuckets)
 	outConns := make([]bucketOut, chartBuckets)
 	outTPS := make([]bucketOut, chartBuckets)
+	outCache := make([]bucketOut, chartBuckets)
 	for i, b := range buckets {
 		t := start.Add(time.Duration(i) * bs).UnixMilli()
 
 		v := map[string]float64{}
 		cv := map[string]float64{}
 		tv := map[string]float64{}
+		hv := map[string]float64{}
+		if b.cacheN > 0 {
+			hv[cacheClasses[0]] = round2(b.cache / float64(b.cacheN))
+		}
 		if b.samples > 0 {
 			merged := map[string]int{}
 			for class, n := range b.count {
@@ -591,11 +753,12 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		outBuckets[i] = bucketOut{T: t, V: v}
 		outConns[i] = bucketOut{T: t, V: cv}
 		outTPS[i] = bucketOut{T: t, V: tv}
+		outCache[i] = bucketOut{T: t, V: hv}
 	}
 
 	var top []topSQLOut
 	for q, n := range queryCount {
-		entry := topSQLOut{Query: q, ByClass: map[string]float64{}}
+		entry := topSQLOut{Query: q, ByClass: map[string]float64{}, queryID: queryIDOf[q]}
 		if totalSamples > 0 {
 			entry.AAS = round2(float64(n) / float64(totalSamples))
 			merged := map[string]int{}
@@ -635,6 +798,53 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		Conns:         outConns,
 		TPSClasses:    tpsClasses,
 		TPS:           outTPS,
+		CacheClasses:  cacheClasses,
+		CacheHit:      outCache,
+	}
+}
+
+// enrichTopSQL fills the pg_stat_statements columns of each ranked query from
+// the counter deltas between the oldest and newest snapshots inside the
+// window. Pure, for testing.
+func enrichTopSQL(top []topSQLOut, snaps []pgssSnap, windowStart time.Time) {
+	var first, last *pgssSnap
+	for i := range snaps {
+		if snaps[i].at.Before(windowStart) {
+			continue
+		}
+		if first == nil {
+			first = &snaps[i]
+		}
+		last = &snaps[i]
+	}
+	if first == nil || last == nil || first == last {
+		return
+	}
+	dt := last.at.Sub(first.at).Seconds()
+	if dt <= 0 {
+		return
+	}
+
+	for i := range top {
+		id := top[i].queryID
+		if id == 0 {
+			continue
+		}
+		newer, ok := last.stats[id]
+		if !ok {
+			continue
+		}
+		// A query absent from the older snapshot started counting mid-window;
+		// its delta is everything it has.
+		older := first.stats[id]
+		dCalls := newer.calls - older.calls
+		if dCalls <= 0 {
+			continue
+		}
+		top[i].HasStats = true
+		top[i].CallsPS = round2(float64(dCalls) / dt)
+		top[i].RowsPerCall = round2(float64(newer.rows-older.rows) / float64(dCalls))
+		top[i].MSPerCall = round2((newer.totalMS - older.totalMS) / float64(dCalls))
 	}
 }
 

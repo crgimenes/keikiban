@@ -130,7 +130,7 @@
       border-radius: 0.15em;
       display: inline-block;
     }
-    .sql-load { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sql-load { font-variant-numeric: tabular-nums; }
     .sql-text {
       font-family: ui-monospace, monospace;
       font-size: 0.85rem;
@@ -292,6 +292,11 @@
         <h3>Transactions per second</h3>
         <canvas id="tps-chart"></canvas>
         <div class="mini-legend" id="tps-legend"></div>
+      </div>
+      <div class="counter-panel">
+        <h3>Buffer cache hit</h3>
+        <canvas id="cache-chart"></canvas>
+        <div class="mini-legend" id="cache-legend"></div>
       </div>
     </div>
     <h2>Top SQL <span class="hint">by share of active sessions in this

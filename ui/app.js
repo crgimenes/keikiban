@@ -316,6 +316,7 @@ function drawStacked(canvas, classes, buckets, opts = {}) {
     if (total > dataMax) dataMax = total;
   }
   let yMax = Math.max(1, Math.ceil(dataMax));
+  if (opts.yMaxFixed) yMax = opts.yMaxFixed;
   // A reference line (e.g. max_connections) joins the scale only when it
   // would not flatten the data.
   const ref = opts.refValue || 0;
@@ -410,6 +411,7 @@ const CONN_COLORS = {
   other: "#8e24aa",
 };
 const TPS_COLORS = { "commits/s": "#2e7d32", "rollbacks/s": "#e53935" };
+const CACHE_COLOR = "#00acc1";
 
 function drawCounters() {
   drawStacked(el("conns-chart"), dash.connClasses, dash.conns, {
@@ -421,10 +423,15 @@ function drawCounters() {
   drawStacked(el("tps-chart"), dash.tpsClasses, dash.tps, {
     colorOf: (c) => TPS_COLORS[c] || "#78909c",
   });
+  drawStacked(el("cache-chart"), dash.cacheClasses, dash.cacheHit, {
+    colorOf: () => CACHE_COLOR,
+    yMaxFixed: 100,
+  });
   renderMiniLegend("conns-legend", dash.connClasses,
     (c) => CONN_COLORS[c] || "#78909c");
   renderMiniLegend("tps-legend", dash.tpsClasses,
     (c) => TPS_COLORS[c] || "#78909c");
+  renderMiniLegend("cache-legend", dash.cacheClasses, () => CACHE_COLOR);
 }
 
 function renderMiniLegend(id, classes, colorOf) {
@@ -463,8 +470,14 @@ function renderTopSQL() {
     cell.className = "cell";
     const load = document.createElement("div");
     load.className = "sql-load";
-    load.textContent = q.aas.toFixed(2) + " avg active sessions (" +
+    let label = q.aas.toFixed(2) + " avg active sessions (" +
       q.pct.toFixed(1) + "%)";
+    if (q.hasStats) {
+      label += " · " + q.callsPS.toFixed(2) + " calls/s · " +
+        q.rowsPerCall.toFixed(1) + " rows/call · " +
+        q.msPerCall.toFixed(1) + " ms/call";
+    }
+    load.textContent = label;
     // The bar spans the query's share of the window and splits it by wait
     // class in the chart colors, like Performance Insights.
     const bar = document.createElement("div");

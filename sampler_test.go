@@ -168,6 +168,42 @@ func TestAggregateStableBuckets(t *testing.T) {
 	}
 }
 
+func TestEnrichTopSQL(t *testing.T) {
+	base := time.Date(2026, 7, 25, 12, 0, 0, 0, time.UTC)
+	snaps := []pgssSnap{
+		// Before the window: must be ignored.
+		{at: base.Add(-10 * time.Minute), stats: map[int64]pgssStat{
+			42: {calls: 1, rows: 1, totalMS: 1},
+		}},
+		{at: base.Add(-60 * time.Second), stats: map[int64]pgssStat{
+			42: {calls: 100, rows: 1000, totalMS: 500},
+		}},
+		{at: base.Add(-30 * time.Second), stats: map[int64]pgssStat{
+			42: {calls: 160, rows: 1300, totalMS: 800},
+			99: {calls: 30, rows: 30, totalMS: 90},
+		}},
+	}
+
+	top := []topSQLOut{
+		{Query: "SELECT a", queryID: 42},
+		{Query: "SELECT new", queryID: 99}, // absent from the older snapshot
+		{Query: "no id", queryID: 0},
+	}
+	enrichTopSQL(top, snaps, base.Add(-5*time.Minute))
+
+	// 60 calls over 30s = 2/s; 300 rows / 60 calls = 5; 300ms / 60 = 5.
+	if !top[0].HasStats || top[0].CallsPS != 2 || top[0].RowsPerCall != 5 || top[0].MSPerCall != 5 {
+		t.Errorf("enriched = %+v, want 2 calls/s, 5 rows/call, 5 ms/call", top[0])
+	}
+	// Mid-window arrival: its whole count is the delta.
+	if !top[1].HasStats || top[1].CallsPS != 1 {
+		t.Errorf("new query = %+v, want 1 calls/s", top[1])
+	}
+	if top[2].HasStats {
+		t.Error("query without id must not be enriched")
+	}
+}
+
 func TestAggregateEmpty(t *testing.T) {
 	out := aggregate(nil, time.Now(), 300)
 	if len(out.Buckets) != chartBuckets {
