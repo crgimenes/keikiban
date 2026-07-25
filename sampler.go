@@ -1,0 +1,654 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+const (
+	sampleEvery     = time.Second
+	sampleKeep      = time.Hour
+	sampleTimeout   = 3 * time.Second
+	connectTimeout  = 8 * time.Second
+	reconnectAfter  = 5 * time.Second
+	chartBuckets    = 100
+	chartClassLimit = 10
+	topSQLLimit     = 10
+	maxQueryRunes   = 300
+)
+
+// requiredExtensions enrich the dashboard but are optional; when absent the
+// UI shows the yellow badge with install hints instead of failing.
+var requiredExtensions = []string{"pg_stat_statements"}
+
+// activeRow is one active session captured in a sample.
+type activeRow struct {
+	class string // wait event key (waitKey), or CPU when not waiting
+	query string
+}
+
+// sample is one capture of pg_stat_activity plus the cluster counters taken
+// in the same second: connection counts by state and transaction rates.
+type sample struct {
+	at   time.Time
+	rows []activeRow
+
+	connActive int
+	connIdleTx int // idle in transaction (incl. aborted)
+	connIdle   int
+	connOther  int
+
+	commitsPS   float64
+	rollbacksPS float64
+	ratesValid  bool
+}
+
+// Sampler keeps a sliding in-memory window of activity samples for one
+// database, Performance Insights style: average active sessions over time,
+// sliced by wait class. History lives only while the app runs, by design.
+type Sampler struct {
+	mu        sync.Mutex
+	samples   []sample
+	status    string
+	missing   []string
+	preloaded []string // subset of missing already in shared_preload_libraries
+	maxConns  int
+	cancel    context.CancelFunc
+	done      chan struct{}
+
+	// previous cumulative counters, for the per-second transaction rates.
+	prevAt        time.Time
+	prevCommits   int64
+	prevRollbacks int64
+	prevValid     bool
+}
+
+func newSampler(url string) *Sampler {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Sampler{
+		status: "connecting",
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
+	go s.run(ctx, url)
+	return s
+}
+
+// Stop ends the sampling goroutine and waits for it to close its connection.
+func (s *Sampler) Stop() {
+	s.cancel()
+	<-s.done
+}
+
+func (s *Sampler) setStatus(status string) {
+	s.mu.Lock()
+	s.status = status
+	s.mu.Unlock()
+}
+
+// run is the sampling loop: connect, detect optional extensions, then one
+// activity sample per second. Any error degrades to a visible status and a
+// reconnect with backoff; a monitoring tool must not die with its patient.
+func (s *Sampler) run(ctx context.Context, url string) {
+	defer close(s.done)
+	for {
+		err := s.sampleUntilError(ctx, url)
+		if ctx.Err() != nil {
+			return
+		}
+		s.setStatus(fmt.Sprintf("reconnecting: %v", err))
+		debugf("event=sampler_reconnect err=%q", err)
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(reconnectAfter):
+		}
+	}
+}
+
+func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
+	connCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+	conn, err := pgx.Connect(connCtx, url)
+	cancel()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), sampleTimeout)
+		_ = conn.Close(closeCtx)
+		cancel()
+	}()
+
+	missing, preloaded, err := missingExtensions(ctx, conn)
+	if err != nil {
+		return err
+	}
+	maxConns, err := maxConnections(ctx, conn)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.missing = missing
+	s.preloaded = preloaded
+	s.maxConns = maxConns
+	s.status = "sampling"
+	s.mu.Unlock()
+	debugf("event=sampler_connected missing_extensions=%q preloaded=%q max_connections=%d",
+		strings.Join(missing, ","), strings.Join(preloaded, ","), maxConns)
+
+	ticker := time.NewTicker(sampleEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+
+		smp, err := sampleActivity(ctx, conn)
+		if err != nil {
+			return err
+		}
+		err = s.sampleCounters(ctx, conn, &smp)
+		if err != nil {
+			return err
+		}
+		if len(smp.rows) > 0 {
+			debugf("event=sample active=%d", len(smp.rows))
+		}
+		s.push(smp)
+	}
+}
+
+// sampleCounters fills smp with the transaction rates derived from the
+// cluster-wide cumulative counters. A negative delta (stats reset) just marks
+// the rates invalid for this sample.
+func (s *Sampler) sampleCounters(ctx context.Context, conn *pgx.Conn, smp *sample) error {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	var commits, rollbacks int64
+	err := conn.QueryRow(qctx, `SELECT
+			COALESCE(sum(xact_commit), 0)::bigint,  -- 1
+			COALESCE(sum(xact_rollback), 0)::bigint -- 2
+		FROM pg_stat_database;`).Scan(
+		&commits,   // 1
+		&rollbacks, // 2
+	)
+	if err != nil {
+		return err
+	}
+
+	dt := smp.at.Sub(s.prevAt).Seconds()
+	if s.prevValid && dt > 0 && commits >= s.prevCommits && rollbacks >= s.prevRollbacks {
+		smp.commitsPS = round2(float64(commits-s.prevCommits) / dt)
+		smp.rollbacksPS = round2(float64(rollbacks-s.prevRollbacks) / dt)
+		smp.ratesValid = true
+	}
+	s.prevAt = smp.at
+	s.prevCommits = commits
+	s.prevRollbacks = rollbacks
+	s.prevValid = true
+	return nil
+}
+
+func maxConnections(ctx context.Context, conn *pgx.Conn) (int, error) {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	var v string
+	err := conn.QueryRow(qctx, `SHOW max_connections;`).Scan(&v)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	_, err = fmt.Sscanf(v, "%d", &n)
+	if err != nil {
+		return 0, nil
+	}
+	return n, nil
+}
+
+const sqlActivity = `SELECT
+		COALESCE(state, ''),           -- 1
+		COALESCE(wait_event_type, ''), -- 2
+		COALESCE(wait_event, ''),      -- 3
+		COALESCE(query, ''),           -- 4
+		backend_type                   -- 5
+	FROM pg_stat_activity
+	WHERE pid <> pg_backend_pid()
+	AND backend_type IN ('client backend', 'parallel worker');`
+
+// sampleActivity captures one second of pg_stat_activity: the active sessions
+// feed the load chart, and every client backend is counted by state for the
+// connections chart.
+func sampleActivity(ctx context.Context, conn *pgx.Conn) (sample, error) {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	smp := sample{at: time.Now()}
+	rows, err := conn.Query(qctx, sqlActivity)
+	if err != nil {
+		return smp, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var state, typ, event, query, backend string
+		err = rows.Scan(
+			&state,   // 1
+			&typ,     // 2
+			&event,   // 3
+			&query,   // 4
+			&backend, // 5
+		)
+		if err != nil {
+			return smp, err
+		}
+
+		if state == "active" {
+			smp.rows = append(smp.rows, activeRow{
+				class: waitKey(typ, event),
+				query: query,
+			})
+		}
+		if backend != "client backend" {
+			continue
+		}
+		switch state {
+		case "active":
+			smp.connActive++
+		case "idle in transaction", "idle in transaction (aborted)":
+			smp.connIdleTx++
+		case "idle":
+			smp.connIdle++
+		default:
+			smp.connOther++
+		}
+	}
+	return smp, rows.Err()
+}
+
+// waitKey labels one sampled session the way Performance Insights does for
+// PostgreSQL: the specific wait event prefixed by its class ("IO:WALSync",
+// "LWLock:WALWrite"), and plain "CPU" for a session that is not waiting.
+func waitKey(typ, event string) string {
+	if typ == "" {
+		return "CPU"
+	}
+	if event == "" {
+		return typ
+	}
+	return typ + ":" + event
+}
+
+// missingExtensions reports which optional extensions are not created in the
+// CONNECTED database (pg_extension is per-database), and which of those are
+// already in shared_preload_libraries — for them a plain CREATE EXTENSION is
+// enough, no restart.
+func missingExtensions(ctx context.Context, conn *pgx.Conn) (missing, preloaded []string, err error) {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	installed := map[string]bool{}
+	rows, err := conn.Query(qctx, `SELECT extname FROM pg_extension;`)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		err = rows.Scan(&name)
+		if err != nil {
+			return nil, nil, err
+		}
+		installed[name] = true
+	}
+	if rows.Err() != nil {
+		return nil, nil, rows.Err()
+	}
+
+	var spl string
+	err = conn.QueryRow(qctx, `SHOW shared_preload_libraries;`).Scan(&spl)
+	if err != nil {
+		return nil, nil, err
+	}
+	loaded := map[string]bool{}
+	for lib := range strings.SplitSeq(spl, ",") {
+		loaded[strings.TrimSpace(lib)] = true
+	}
+
+	for _, want := range requiredExtensions {
+		if installed[want] {
+			continue
+		}
+		missing = append(missing, want)
+		if loaded[want] {
+			preloaded = append(preloaded, want)
+		}
+	}
+	return missing, preloaded, nil
+}
+
+func (s *Sampler) push(smp sample) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.samples = append(s.samples, smp)
+
+	cutoff := smp.at.Add(-sampleKeep)
+	first := 0
+	for first < len(s.samples) && s.samples[first].at.Before(cutoff) {
+		first++
+	}
+	s.samples = s.samples[first:]
+}
+
+// bucketOut is one time slice of the stacked chart: average active sessions
+// per wait class.
+type bucketOut struct {
+	T int64              `json:"t"` // bucket start, unix milliseconds
+	V map[string]float64 `json:"v"`
+}
+
+// topSQLOut ranks one query by its share of the sampled load. ByClass splits
+// that load across wait classes, Performance Insights style, so the per-query
+// bar can reuse the chart colors.
+type topSQLOut struct {
+	Query   string             `json:"query"`
+	AAS     float64            `json:"aas"`
+	Pct     float64            `json:"pct"`
+	ByClass map[string]float64 `json:"byClass"`
+}
+
+// dashOut is the dashboard snapshot handed to the UI (and, later, to the IPC
+// endpoint for AI agents: one place, one serialization).
+type dashOut struct {
+	Connected     bool   `json:"connected"`
+	Status        string `json:"status"`
+	Title         string `json:"title"`
+	URL           string `json:"url"`
+	WindowSeconds int    `json:"windowSeconds"`
+	BucketSeconds int    `json:"bucketSeconds"`
+	// Samples is how many activity captures landed in the window; it lets the
+	// UI distinguish "sampling an idle database" from "not sampling at all".
+	Samples int         `json:"samples"`
+	Classes []string    `json:"classes"`
+	Buckets []bucketOut `json:"buckets"`
+	TopSQL  []topSQLOut `json:"topSQL"`
+	Missing []string    `json:"missingExtensions"`
+	// MissingPreloaded lists the missing extensions whose library is already
+	// preloaded: installing them is one CREATE EXTENSION, no server restart.
+	MissingPreloaded []string `json:"missingPreloaded"`
+
+	// Counter charts, same closed-bucket timeline as the load chart.
+	ConnClasses    []string    `json:"connClasses"`
+	Conns          []bucketOut `json:"conns"`
+	MaxConnections int         `json:"maxConnections"`
+	TPSClasses     []string    `json:"tpsClasses"`
+	TPS            []bucketOut `json:"tps"`
+}
+
+// Connection-state and transaction-rate series share fixed class names; the
+// UI maps them to fixed colors.
+var (
+	connClasses = []string{"active", "idle in transaction", "idle", "other"}
+	tpsClasses  = []string{"commits/s", "rollbacks/s"}
+)
+
+// Snapshot aggregates the sliding window ending now into chart buckets and a
+// top-SQL ranking.
+func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
+	s.mu.Lock()
+	samples := s.samples
+	status := s.status
+	missing := s.missing
+	preloaded := s.preloaded
+	s.mu.Unlock()
+
+	out := aggregate(samples, now, windowSeconds)
+	out.Connected = status == "sampling"
+	out.Status = status
+	out.Missing = missing
+	if out.Missing == nil {
+		out.Missing = []string{}
+	}
+	out.MissingPreloaded = preloaded
+	if out.MissingPreloaded == nil {
+		out.MissingPreloaded = []string{}
+	}
+	s.mu.Lock()
+	out.MaxConnections = s.maxConns
+	s.mu.Unlock()
+	return out
+}
+
+// aggregate is the pure core of Snapshot, separated for testing.
+//
+// Buckets align to ABSOLUTE time boundaries (multiples of the bucket size),
+// not to "now": a sample lands in one bucket and stays there forever, so the
+// past never redraws differently between refreshes. The in-progress bucket is
+// not charted at all — its average wobbles as samples arrive, which reads as
+// the chart rewriting itself; it appears once its period closes.
+func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
+	if windowSeconds < chartBuckets {
+		windowSeconds = chartBuckets
+	}
+	bucketSeconds := windowSeconds / chartBuckets
+	bs := time.Duration(bucketSeconds) * time.Second
+	end := now.Truncate(bs) // exclusive: the forming bucket stays out
+	start := end.Add(-time.Duration(chartBuckets) * bs)
+
+	type agg struct {
+		count   map[string]int
+		samples int
+		conns   [4]int     // sums by connClasses order
+		rates   [2]float64 // sums by tpsClasses order
+		rateN   int
+	}
+	buckets := make([]agg, chartBuckets)
+	for i := range buckets {
+		buckets[i].count = map[string]int{}
+	}
+
+	classSeen := map[string]bool{}
+	queryCount := map[string]int{}
+	queryByClass := map[string]map[string]int{}
+	totalSamples := 0
+	totalRows := 0
+
+	for _, smp := range samples {
+		if smp.at.Before(start) || !smp.at.Before(end) {
+			continue
+		}
+		idx := int(smp.at.Sub(start) / bs)
+		if idx >= chartBuckets {
+			idx = chartBuckets - 1
+		}
+		buckets[idx].samples++
+		totalSamples++
+		buckets[idx].conns[0] += smp.connActive
+		buckets[idx].conns[1] += smp.connIdleTx
+		buckets[idx].conns[2] += smp.connIdle
+		buckets[idx].conns[3] += smp.connOther
+		if smp.ratesValid {
+			buckets[idx].rates[0] += smp.commitsPS
+			buckets[idx].rates[1] += smp.rollbacksPS
+			buckets[idx].rateN++
+		}
+		for _, row := range smp.rows {
+			buckets[idx].count[row.class]++
+			classSeen[row.class] = true
+			totalRows++
+			q := normalizeQuery(row.query)
+			if q == "" {
+				continue
+			}
+			queryCount[q]++
+			if queryByClass[q] == nil {
+				queryByClass[q] = map[string]int{}
+			}
+			queryByClass[q][row.class]++
+		}
+	}
+
+	// Performance Insights keeps the chart legible by showing the top wait
+	// events and folding the tail into a gray "Other".
+	classTotal := map[string]int{}
+	for _, b := range buckets {
+		for class, n := range b.count {
+			classTotal[class] += n
+		}
+	}
+	var ranked []string
+	for c := range classSeen {
+		ranked = append(ranked, c)
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if classTotal[ranked[i]] != classTotal[ranked[j]] {
+			return classTotal[ranked[i]] > classTotal[ranked[j]]
+		}
+		return ranked[i] < ranked[j]
+	})
+	kept := map[string]bool{}
+	if classSeen["CPU"] {
+		kept["CPU"] = true
+	}
+	for _, c := range ranked {
+		if len(kept) >= chartClassLimit {
+			break
+		}
+		kept[c] = true
+	}
+	mapClass := func(c string) string {
+		if kept[c] {
+			return c
+		}
+		return "Other"
+	}
+
+	// Stacking order: CPU at the bottom (like PI), then by load, Other last.
+	var classes []string
+	hasOther := false
+	if classSeen["CPU"] {
+		classes = append(classes, "CPU")
+	}
+	for _, c := range ranked {
+		if c == "CPU" {
+			continue
+		}
+		if kept[c] {
+			classes = append(classes, c)
+			continue
+		}
+		hasOther = true
+	}
+	if hasOther {
+		classes = append(classes, "Other")
+	}
+	if classes == nil {
+		// nil marshals to JSON null and a null breaks the UI's iteration; an
+		// idle window is an empty list, not an absence.
+		classes = []string{}
+	}
+
+	outBuckets := make([]bucketOut, chartBuckets)
+	outConns := make([]bucketOut, chartBuckets)
+	outTPS := make([]bucketOut, chartBuckets)
+	for i, b := range buckets {
+		t := start.Add(time.Duration(i) * bs).UnixMilli()
+
+		v := map[string]float64{}
+		cv := map[string]float64{}
+		tv := map[string]float64{}
+		if b.samples > 0 {
+			merged := map[string]int{}
+			for class, n := range b.count {
+				merged[mapClass(class)] += n
+			}
+			for class, n := range merged {
+				v[class] = round2(float64(n) / float64(b.samples))
+			}
+			for j, name := range connClasses {
+				if b.conns[j] > 0 {
+					cv[name] = round2(float64(b.conns[j]) / float64(b.samples))
+				}
+			}
+		}
+		if b.rateN > 0 {
+			for j, name := range tpsClasses {
+				if b.rates[j] > 0 {
+					tv[name] = round2(b.rates[j] / float64(b.rateN))
+				}
+			}
+		}
+		outBuckets[i] = bucketOut{T: t, V: v}
+		outConns[i] = bucketOut{T: t, V: cv}
+		outTPS[i] = bucketOut{T: t, V: tv}
+	}
+
+	var top []topSQLOut
+	for q, n := range queryCount {
+		entry := topSQLOut{Query: q, ByClass: map[string]float64{}}
+		if totalSamples > 0 {
+			entry.AAS = round2(float64(n) / float64(totalSamples))
+			merged := map[string]int{}
+			for class, cn := range queryByClass[q] {
+				merged[mapClass(class)] += cn
+			}
+			for class, cn := range merged {
+				entry.ByClass[class] = round2(float64(cn) / float64(totalSamples))
+			}
+		}
+		if totalRows > 0 {
+			entry.Pct = round2(100 * float64(n) / float64(totalRows))
+		}
+		top = append(top, entry)
+	}
+	sort.Slice(top, func(i, j int) bool {
+		if top[i].AAS != top[j].AAS {
+			return top[i].AAS > top[j].AAS
+		}
+		return top[i].Query < top[j].Query
+	})
+	if len(top) > topSQLLimit {
+		top = top[:topSQLLimit]
+	}
+	if top == nil {
+		top = []topSQLOut{}
+	}
+
+	return dashOut{
+		WindowSeconds: windowSeconds,
+		BucketSeconds: bucketSeconds,
+		Samples:       totalSamples,
+		Classes:       classes,
+		Buckets:       outBuckets,
+		TopSQL:        top,
+		ConnClasses:   connClasses,
+		Conns:         outConns,
+		TPSClasses:    tpsClasses,
+		TPS:           outTPS,
+	}
+}
+
+// normalizeQuery trims and caps a query for display grouping; runes, not
+// bytes, so multi-byte characters are never split.
+func normalizeQuery(q string) string {
+	q = strings.TrimSpace(q)
+	r := []rune(q)
+	if len(r) > maxQueryRunes {
+		return string(r[:maxQueryRunes]) + "..."
+	}
+	return q
+}
+
+func round2(f float64) float64 {
+	return float64(int(f*100+0.5)) / 100
+}

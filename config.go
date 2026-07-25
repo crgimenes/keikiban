@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/crgimenes/filo"
+	"github.com/jackc/pgx/v5"
 )
 
 // Connection is one database declared in the config file.
@@ -110,15 +111,14 @@ func parseConfig(src string) ([]Connection, error) {
 			}
 		}
 
-		masked := maskURL(dbURL)
 		if title == "" {
-			title = masked
+			title = defaultTitle(dbURL)
 		}
 
 		conns = append(conns, Connection{
 			URL:       dbURL,
 			Title:     title,
-			MaskedURL: masked,
+			MaskedURL: maskURL(dbURL),
 		})
 		return filo.VBool(true), nil
 	})
@@ -236,6 +236,23 @@ func rewriteConnectionLine(path string, index int, form string) error {
 		return fmt.Errorf("write config %s: %w", path, err)
 	}
 	return nil
+}
+
+// defaultTitle names an untitled connection without ever exposing the URL on
+// screen (a URL can carry a password): the database name when the connection
+// string states one, otherwise the host.
+func defaultTitle(dbURL string) string {
+	cc, err := pgx.ParseConfig(dbURL)
+	if err != nil {
+		return "connection"
+	}
+	if cc.Database != "" {
+		return cc.Database
+	}
+	if cc.Host != "" {
+		return cc.Host
+	}
+	return "connection"
 }
 
 // hasCode reports whether the Filo source contains anything beyond whitespace

@@ -30,9 +30,29 @@ func TestParseConfig(t *testing.T) {
 		t.Errorf("masked url leaks password: %q", conns[0].MaskedURL)
 	}
 
-	// No title: defaults to the masked URL.
-	if conns[1].Title != "postgres://localhost/dev" {
-		t.Errorf("default title = %q", conns[1].Title)
+	// No title: defaults to the database name, never the URL (a URL can carry
+	// a password and must not reach the screen).
+	if conns[1].Title != "dev" {
+		t.Errorf("default title = %q, want dev", conns[1].Title)
+	}
+}
+
+func TestDefaultTitle(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"postgres://alice:secret@host:5432/app", "app"},
+		{"host=localhost dbname=app password=x", "app"},
+		{"postgres://alice@host:5432/", "host"}, // no dbname stated: host
+	}
+	for _, c := range cases {
+		got := defaultTitle(c.in)
+		if got != c.want {
+			t.Errorf("defaultTitle(%q) = %q, want %q", c.in, got, c.want)
+		}
+		if strings.Contains(got, "secret") || strings.Contains(got, "password") {
+			t.Errorf("defaultTitle(%q) leaks credentials: %q", c.in, got)
+		}
 	}
 }
 

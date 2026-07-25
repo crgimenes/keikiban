@@ -38,6 +38,116 @@
     /* Delete lives apart from the safe actions in the same row. */
     #delete { margin-right: auto; }
     button.icon-only { padding: 0.3rem 0.55rem; }
+
+    /* Dashboard */
+    .dash-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .dash-header h2 { margin: 0; }
+    .dash-actions { margin-top: 0; margin-left: auto; }
+    .windows { display: inline-flex; gap: 0.2rem; }
+    .win[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
+    /* Chart with the legend to its right, Performance Insights style; on a
+       narrow window the legend wraps below. */
+    #chart-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    #chart-box { position: relative; flex: 1 1 24rem; }
+    #chart { width: 100%; height: 300px; display: block; }
+    /* The dashboard grows downward like a web page; counter charts sit side
+       by side while they fit, then stack. */
+    #counters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+    .counter-panel h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+    .counter-panel canvas { width: 100%; height: 170px; display: block; }
+    .mini-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem 1rem;
+      margin-top: 0.35rem;
+      font-size: 0.8rem;
+    }
+    #chart-tip {
+      position: absolute;
+      pointer-events: none;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid rgba(127, 127, 127, 0.5);
+      border-radius: 0.3rem;
+      background: Canvas;
+      box-shadow: 0 0.15rem 0.6rem rgba(0, 0, 0, 0.25);
+      font-size: 0.8rem;
+      z-index: 1;
+      white-space: nowrap;
+    }
+    #chart-tip .legend-swatch { margin-right: 0.3em; }
+    #ext-badge {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      color: light-dark(#b58900, #ffd54f);
+    }
+    #ext-tip {
+      position: absolute;
+      top: 2.4rem;
+      right: 0.4rem;
+      max-width: 34rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid rgba(127, 127, 127, 0.5);
+      border-radius: 0.4rem;
+      background: Canvas;
+      box-shadow: 0 0.2rem 1rem rgba(0, 0, 0, 0.25);
+      z-index: 1;
+    }
+    #ext-tip pre {
+      overflow-x: auto;
+      font-size: 0.85rem;
+      padding: 0.5rem;
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 0.3rem;
+    }
+    #legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      min-width: 7rem;
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.35em; }
+    .legend-swatch {
+      width: 0.75em;
+      height: 0.75em;
+      border-radius: 0.15em;
+      display: inline-block;
+    }
+    .sql-load { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sql-text {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.3rem;
+    }
+    /* Per-query load bar, stacked by wait class in the chart colors. */
+    .sql-bar {
+      display: flex;
+      height: 0.45rem;
+      border-radius: 0.2rem;
+      overflow: hidden;
+      margin-top: 0.35rem;
+      background: rgba(127, 127, 127, 0.15);
+    }
+    .sql-bar span { height: 100%; }
     /* Buttons anchor to the right edge and follow it on resize. */
     .buttons {
       margin-top: 1rem;
@@ -62,7 +172,6 @@
       opacity: 0.75;
       margin-left: 0.5rem;
     }
-    .conn-url { font-size: 0.85rem; opacity: 0.75; word-break: break-all; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -111,10 +220,63 @@
       The file is yours: keikiban only appends to it, never rewrites it.</p>
   </section>
 
+  <section id="dashboard" hidden>
+    <div class="dash-header">
+      <h2 id="dash-title"></h2>
+      <div class="buttons dash-actions">
+        <span class="windows" role="group" aria-label="Time window">
+          <button type="button" class="win" data-window="300">5m</button>
+          <button type="button" class="win" data-window="900">15m</button>
+          <button type="button" class="win" data-window="3600">1h</button>
+        </span>
+        <button type="button" id="pause" class="icon-only"
+          aria-label="Pause auto-refresh" title="Pause auto-refresh"></button>
+        <button type="button" id="connections-btn">Connections</button>
+      </div>
+    </div>
+    <p id="dash-status" class="hint" aria-live="polite"></p>
+    <div id="chart-row">
+      <div id="chart-box">
+        <canvas id="chart"></canvas>
+        <div id="chart-tip" hidden></div>
+        <button type="button" id="ext-badge" class="icon-only" hidden
+          aria-label="Missing extensions" title="Missing extensions"></button>
+        <div id="ext-tip" hidden>
+          <p>Top SQL gets richer with <span id="ext-names"></span> installed.
+            The dashboard works without it; this only adds precision
+            (normalized queries, exact timings). Extensions are created per
+            database: this check looked at the connected one.</p>
+          <pre id="ext-cmds"></pre>
+          <div class="buttons">
+            <button type="button" id="ext-copy">Copy commands</button>
+            <button type="button" id="ext-close">Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="legend"></div>
+    </div>
+    <div id="counters">
+      <div class="counter-panel">
+        <h3>Connections <span class="hint" id="conn-max"></span></h3>
+        <canvas id="conns-chart"></canvas>
+        <div class="mini-legend" id="conns-legend"></div>
+      </div>
+      <div class="counter-panel">
+        <h3>Transactions per second</h3>
+        <canvas id="tps-chart"></canvas>
+        <div class="mini-legend" id="tps-legend"></div>
+      </div>
+    </div>
+    <h2>Top SQL <span class="hint">by share of active sessions in this
+      window</span></h2>
+    <div id="topsql"></div>
+  </section>
+
   <section id="list" hidden>
     <h2>Connections</h2>
     <div id="connections"></div>
     <div class="buttons">
+      <button type="button" id="back" hidden>Back</button>
       <button type="button" id="add">Add connection</button>
     </div>
     <p class="hint">The first connection is the default: it will load the

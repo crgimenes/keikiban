@@ -14,6 +14,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/crgimenes/glaze"
@@ -116,10 +117,44 @@ func runGUI(cfg Config, configErr string) {
 	defer w.Destroy()
 
 	// Sized for the setup/list screens; user-resizable with a sane floor.
+	// Dashboard-sized; user-resizable with a sane floor.
 	w.SetTitle("keikiban")
-	w.SetSize(680, 500, glaze.HintNone)
-	w.SetSize(480, 380, glaze.HintMin)
+	w.SetSize(1200, 860, glaze.HintNone)
+	w.SetSize(560, 480, glaze.HintMin)
 
+	// mu guards cfg, configErr and the sampler: Bind callbacks run on
+	// background goroutines and may overlap.
+	var mu sync.Mutex
+	var sampler *Sampler
+	samplerURL := ""
+
+	// ensureSampler keeps one sampler alive for the default (first)
+	// connection, restarting it when that connection changes. Callers hold mu.
+	ensureSampler := func() {
+		want := ""
+		if len(cfg.Connections) > 0 {
+			want = cfg.Connections[0].URL
+		}
+		if want == samplerURL {
+			return
+		}
+		if sampler != nil {
+			sampler.Stop()
+			sampler = nil
+		}
+		samplerURL = want
+		if want != "" {
+			sampler = newSampler(want)
+		}
+	}
+	ensureSampler()
+	defer func() {
+		if sampler != nil {
+			sampler.Stop()
+		}
+	}()
+
+	// state assumes mu is held.
 	state := func() uiState {
 		if cfg.Connections == nil {
 			cfg.Connections = []Connection{}
@@ -133,7 +168,35 @@ func runGUI(cfg Config, configErr string) {
 	}
 
 	err = w.Bind("configState", func() (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		return state(), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("dashboardState", func(windowSeconds int) (dashOut, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if sampler == nil {
+			return dashOut{
+				Status:           "no connection configured",
+				Classes:          []string{},
+				Buckets:          []bucketOut{},
+				TopSQL:           []topSQLOut{},
+				Missing:          []string{},
+				MissingPreloaded: []string{},
+				ConnClasses:      []string{},
+				Conns:            []bucketOut{},
+				TPSClasses:       []string{},
+				TPS:              []bucketOut{},
+			}, nil
+		}
+		out := sampler.Snapshot(time.Now(), windowSeconds)
+		out.Title = cfg.Connections[0].Title
+		out.URL = cfg.Connections[0].MaskedURL
+		return out, nil
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -146,8 +209,18 @@ func runGUI(cfg Config, configErr string) {
 		log.Fatal(err)
 	}
 
+	// A JS exception inside the webview is invisible from the terminal; the
+	// page forwards them here so -debug shows UI failures too.
+	err = w.Bind("logError", func(msg string) error {
+		debugf("event=ui_error msg=%q", msg)
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// reload re-reads the config after a mutation so the UI always reflects
-	// the file, the single source of truth.
+	// the file, the single source of truth. Assumes mu is held.
 	reload := func() (uiState, error) {
 		reloaded, err := loadConfig()
 		if err != nil {
@@ -155,6 +228,7 @@ func runGUI(cfg Config, configErr string) {
 		}
 		cfg = reloaded
 		configErr = ""
+		ensureSampler()
 		return state(), nil
 	}
 
@@ -167,6 +241,8 @@ func runGUI(cfg Config, configErr string) {
 	}
 
 	err = w.Bind("addConnection", func(dbURL, title string) (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		dbURL = strings.TrimSpace(dbURL)
 		err := validateURL(dbURL)
 		if err != nil {
@@ -184,6 +260,8 @@ func runGUI(cfg Config, configErr string) {
 	}
 
 	err = w.Bind("updateConnection", func(index int, dbURL, title string) (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		dbURL = strings.TrimSpace(dbURL)
 		err := validateURL(dbURL)
 		if err != nil {
@@ -201,6 +279,8 @@ func runGUI(cfg Config, configErr string) {
 	}
 
 	err = w.Bind("deleteConnection", func(index int) (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		err := deleteConnection(cfg.Path, index)
 		if err != nil {
 			return uiState{}, err
@@ -215,6 +295,8 @@ func runGUI(cfg Config, configErr string) {
 	// connectionURL hands the real URL (password included) to the edit form
 	// only; every displayed or logged URL stays masked.
 	err = w.Bind("connectionURL", func(index int) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		if index < 0 || index >= len(cfg.Connections) {
 			return "", fmt.Errorf("connection %d does not exist", index)
 		}
