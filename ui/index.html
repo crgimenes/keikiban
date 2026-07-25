@@ -149,6 +149,14 @@
     }
     .sql-bar span { height: 100%; }
 
+    /* Blocking tree */
+    .blocked-item {
+      margin-top: 0.5rem;
+      padding-left: 0.8rem;
+      border-left: 3px solid light-dark(#b3261e, #ff7369);
+    }
+    .chain-note { font-size: 0.85rem; }
+
     /* Index health */
     #indexes h3 { margin-bottom: 0.2rem; }
     #indexes h3 + .hint { margin-top: 0; }
@@ -294,11 +302,14 @@
         <div class="mini-legend" id="tps-legend"></div>
       </div>
       <div class="counter-panel">
-        <h3>Buffer cache hit</h3>
-        <canvas id="cache-chart"></canvas>
-        <div class="mini-legend" id="cache-legend"></div>
+        <h3>Buffer reads per second</h3>
+        <canvas id="io-chart"></canvas>
+        <div class="mini-legend" id="io-legend"></div>
       </div>
     </div>
+    <h2>Blocking <span class="hint">who is waiting on whom, right now</span></h2>
+    <div id="blocking"></div>
+
     <h2>Top SQL <span class="hint">by share of active sessions in this
       window</span></h2>
     <div id="topsql"></div>

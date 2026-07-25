@@ -94,10 +94,25 @@ func runJSON(cfg Config, configErr string, args []string) {
 		if report.Error != "" {
 			os.Exit(1)
 		}
+	case "locks":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		tree, err := blockingSnapshot(context.Background(), cfg.Connections[0].URL)
+		if err != nil {
+			_ = enc.Encode(map[string]string{"error": err.Error()})
+			os.Exit(1)
+		}
+		_ = enc.Encode(map[string]any{"blocking": tree})
 	default:
 		_ = enc.Encode(map[string]any{
 			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections", "indexes"},
+			"commands": []string{"connections", "indexes", "locks"},
 		})
 		os.Exit(1)
 	}
@@ -205,8 +220,9 @@ func runGUI(cfg Config, configErr string) {
 				Conns:            []bucketOut{},
 				TPSClasses:       []string{},
 				TPS:              []bucketOut{},
-				CacheClasses:     []string{},
-				CacheHit:         []bucketOut{},
+				IOClasses:        []string{},
+				IO:               []bucketOut{},
+				Blocking:         []blockerOut{},
 			}, nil
 		}
 		out := sampler.Snapshot(time.Now(), windowSeconds)
@@ -246,6 +262,22 @@ func runGUI(cfg Config, configErr string) {
 		dbURL := cfg.Connections[0].URL
 		mu.Unlock()
 		return collectIndexReport(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// signalBackend cancels a query or terminates a connection: the same
+	// statement the confirmation dialog displayed.
+	err = w.Bind("signalBackend", func(pid int, terminate bool) error {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			return fmt.Errorf("no connections configured")
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		return cancelBackend(context.Background(), dbURL, pid, terminate)
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -50,8 +50,13 @@ type sample struct {
 	rollbacksPS float64
 	ratesValid  bool
 
-	cacheHitPct float64
-	cacheValid  bool
+	// Buffer traffic per second: volume, not a ratio. A hit ratio is pegged
+	// at 100% whenever the only activity is our own sampling queries, which
+	// read nothing from disk; the two rates always tell the truth, and the
+	// ratio stays visually readable as the proportion between them.
+	blksHitPS  float64
+	blksReadPS float64
+	ioValid    bool
 }
 
 // pgssSnap is one periodic capture of pg_stat_statements counters, keyed by
@@ -81,7 +86,8 @@ type Sampler struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
 
-	pgss []pgssSnap
+	pgss     []pgssSnap
+	blocking []blockerOut
 
 	// previous cumulative counters, for the per-second rates. Touched only by
 	// the sampling goroutine.
@@ -201,6 +207,13 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 		}
 		s.push(smp)
 
+		// pg_blocking_pids is expensive, so it only runs when the sample just
+		// showed someone waiting on a lock.
+		err = s.sampleBlocking(ctx, conn, waitingOnLock(smp.rows))
+		if err != nil {
+			return err
+		}
+
 		tick++
 		if pgssAvailable && tick%pgssEvery == 0 {
 			err = s.samplePGSS(ctx, conn)
@@ -209,6 +222,36 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 			}
 		}
 	}
+}
+
+// waitingOnLock reports whether any sampled session is waiting on a lock.
+func waitingOnLock(rows []activeRow) bool {
+	for _, r := range rows {
+		if strings.HasPrefix(r.class, "Lock:") || r.class == "Lock" {
+			return true
+		}
+	}
+	return false
+}
+
+// sampleBlocking refreshes the blocking tree, or clears it when nothing is
+// waiting on a lock (the common case, at no query cost).
+func (s *Sampler) sampleBlocking(ctx context.Context, conn *pgx.Conn, waiting bool) error {
+	var tree []blockerOut
+	if waiting {
+		var err error
+		tree, err = collectBlocking(ctx, conn)
+		if err != nil {
+			return err
+		}
+		if len(tree) > 0 {
+			debugf("event=blocking blockers=%d", len(tree))
+		}
+	}
+	s.mu.Lock()
+	s.blocking = tree
+	s.mu.Unlock()
+	return nil
 }
 
 func serverVersionNum(ctx context.Context, conn *pgx.Conn) (int, error) {
@@ -303,9 +346,10 @@ func (s *Sampler) sampleCounters(ctx context.Context, conn *pgx.Conn, smp *sampl
 	}
 	dRead := blksRead - s.prevBlksRead
 	dHit := blksHit - s.prevBlksHit
-	if s.prevValid && dRead >= 0 && dHit >= 0 && dRead+dHit > 0 {
-		smp.cacheHitPct = round2(100 * float64(dHit) / float64(dHit+dRead))
-		smp.cacheValid = true
+	if s.prevValid && dt > 0 && dRead >= 0 && dHit >= 0 {
+		smp.blksHitPS = round2(float64(dHit) / dt)
+		smp.blksReadPS = round2(float64(dRead) / dt)
+		smp.ioValid = true
 	}
 	s.prevAt = smp.at
 	s.prevCommits = commits
@@ -535,16 +579,20 @@ type dashOut struct {
 	MaxConnections int         `json:"maxConnections"`
 	TPSClasses     []string    `json:"tpsClasses"`
 	TPS            []bucketOut `json:"tps"`
-	CacheClasses   []string    `json:"cacheClasses"`
-	CacheHit       []bucketOut `json:"cacheHit"`
+	IOClasses      []string    `json:"ioClasses"`
+	IO             []bucketOut `json:"io"`
+
+	// Blocking is the live lock-wait tree (not bucketed): who blocks whom
+	// right now. Empty means nobody is waiting on a lock.
+	Blocking []blockerOut `json:"blocking"`
 }
 
 // Connection-state and transaction-rate series share fixed class names; the
 // UI maps them to fixed colors.
 var (
-	connClasses  = []string{"active", "idle in transaction", "idle", "other"}
-	tpsClasses   = []string{"commits/s", "rollbacks/s"}
-	cacheClasses = []string{"cache hit %"}
+	connClasses = []string{"active", "idle in transaction", "idle", "other"}
+	tpsClasses  = []string{"commits/s", "rollbacks/s"}
+	ioClasses   = []string{"from cache/s", "from disk/s"}
 )
 
 // Snapshot aggregates the sliding window ending now into chart buckets and a
@@ -556,6 +604,7 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 	missing := s.missing
 	preloaded := s.preloaded
 	pgss := s.pgss
+	blocking := s.blocking
 	s.mu.Unlock()
 
 	out := aggregate(samples, now, windowSeconds)
@@ -569,6 +618,10 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 	out.MissingPreloaded = preloaded
 	if out.MissingPreloaded == nil {
 		out.MissingPreloaded = []string{}
+	}
+	out.Blocking = blocking
+	if out.Blocking == nil {
+		out.Blocking = []blockerOut{}
 	}
 	s.mu.Lock()
 	out.MaxConnections = s.maxConns
@@ -598,8 +651,8 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		conns   [4]int     // sums by connClasses order
 		rates   [2]float64 // sums by tpsClasses order
 		rateN   int
-		cache   float64
-		cacheN  int
+		io      [2]float64 // sums by ioClasses order
+		ioN     int
 	}
 	buckets := make([]agg, chartBuckets)
 	for i := range buckets {
@@ -632,9 +685,10 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 			buckets[idx].rates[1] += smp.rollbacksPS
 			buckets[idx].rateN++
 		}
-		if smp.cacheValid {
-			buckets[idx].cache += smp.cacheHitPct
-			buckets[idx].cacheN++
+		if smp.ioValid {
+			buckets[idx].io[0] += smp.blksHitPS
+			buckets[idx].io[1] += smp.blksReadPS
+			buckets[idx].ioN++
 		}
 		for _, row := range smp.rows {
 			buckets[idx].count[row.class]++
@@ -718,7 +772,7 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 	outBuckets := make([]bucketOut, chartBuckets)
 	outConns := make([]bucketOut, chartBuckets)
 	outTPS := make([]bucketOut, chartBuckets)
-	outCache := make([]bucketOut, chartBuckets)
+	outIO := make([]bucketOut, chartBuckets)
 	for i, b := range buckets {
 		t := start.Add(time.Duration(i) * bs).UnixMilli()
 
@@ -726,8 +780,12 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		cv := map[string]float64{}
 		tv := map[string]float64{}
 		hv := map[string]float64{}
-		if b.cacheN > 0 {
-			hv[cacheClasses[0]] = round2(b.cache / float64(b.cacheN))
+		if b.ioN > 0 {
+			for j, name := range ioClasses {
+				if b.io[j] > 0 {
+					hv[name] = round2(b.io[j] / float64(b.ioN))
+				}
+			}
 		}
 		if b.samples > 0 {
 			merged := map[string]int{}
@@ -753,7 +811,7 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		outBuckets[i] = bucketOut{T: t, V: v}
 		outConns[i] = bucketOut{T: t, V: cv}
 		outTPS[i] = bucketOut{T: t, V: tv}
-		outCache[i] = bucketOut{T: t, V: hv}
+		outIO[i] = bucketOut{T: t, V: hv}
 	}
 
 	var top []topSQLOut
@@ -798,8 +856,8 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		Conns:         outConns,
 		TPSClasses:    tpsClasses,
 		TPS:           outTPS,
-		CacheClasses:  cacheClasses,
-		CacheHit:      outCache,
+		IOClasses:     ioClasses,
+		IO:            outIO,
 	}
 }
 

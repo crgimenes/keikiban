@@ -286,7 +286,141 @@ async function refreshDashboard() {
   drawChart();
   drawCounters();
   renderLegend();
+  renderBlocking();
   renderTopSQL();
+}
+
+// signalling: "cancel:<pid>" or "terminate:<pid>" while its confirmation is
+// on screen.
+let signalling = null;
+
+function renderBlocking() {
+  const box = el("blocking");
+  box.replaceChildren();
+
+  if (dash.blocking.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No session is waiting on a lock.";
+    box.append(note);
+    return;
+  }
+
+  for (const b of dash.blocking) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    const title = document.createElement("div");
+    title.className = "conn-title";
+    title.textContent = "pid " + b.pid + " blocks " + b.blocked.length +
+      (b.blocked.length === 1 ? " session" : " sessions");
+    cell.append(title);
+
+    const meta = document.createElement("div");
+    meta.className = "idx-meta";
+    const st = document.createElement("span");
+    st.textContent = b.state + " for " + b.stateSeconds.toFixed(1) + "s";
+    meta.append(st);
+    if (b.user) {
+      const who = document.createElement("span");
+      who.textContent = b.user + (b.app ? " · " + b.app : "");
+      meta.append(who);
+    }
+    if (b.alsoBlocked) {
+      const chain = document.createElement("span");
+      chain.className = "warn-text chain-note";
+      chain.textContent = "also waiting: the root cause is further up the chain";
+      meta.append(chain);
+    }
+    cell.append(meta);
+
+    const q = document.createElement("div");
+    q.className = "sql-text";
+    q.textContent = b.query || "(no query text)";
+    cell.append(q);
+
+    for (const w of b.blocked) {
+      const item = document.createElement("div");
+      item.className = "blocked-item";
+      const head = document.createElement("div");
+      head.className = "idx-meta";
+      const pid = document.createElement("span");
+      pid.textContent = "pid " + w.pid + " waiting " + w.waitSeconds.toFixed(1) + "s";
+      head.append(pid);
+      if (w.lockMode) {
+        const mode = document.createElement("span");
+        mode.textContent = "wants " + w.lockMode;
+        head.append(mode);
+      }
+      if (w.waitEvent) {
+        const ev = document.createElement("span");
+        ev.textContent = "Lock:" + w.waitEvent;
+        head.append(ev);
+      }
+      const wq = document.createElement("div");
+      wq.className = "sql-text";
+      wq.textContent = w.query || "(no query text)";
+      item.append(head, wq);
+      cell.append(item);
+    }
+
+    cell.append(blockerActions(b));
+    box.append(cell);
+  }
+}
+
+function blockerActions(b) {
+  const key = signalling ? signalling.split(":") : null;
+  if (key && Number(key[1]) === b.pid) {
+    const terminate = key[0] === "terminate";
+    const wrap = document.createElement("div");
+    const q = document.createElement("div");
+    q.textContent = terminate
+      ? "Terminate connection " + b.pid + "? Its transaction is rolled back " +
+        "and the client is disconnected."
+      : "Cancel the running query of pid " + b.pid + "? The transaction stays " +
+        "open, so its locks are only released on COMMIT or ROLLBACK.";
+    const stmt = document.createElement("div");
+    stmt.className = "sql-text";
+    stmt.textContent = terminate ? b.terminateSQL : b.cancelSQL;
+    const act = button(terminate ? "Terminate connection" : "Cancel query",
+      () => runSignal(b, terminate));
+    act.classList.add("destructive");
+    wrap.append(q, stmt, buttonRow(
+      button("Cancel", () => {
+        signalling = null;
+        renderBlocking();
+      }),
+      act,
+    ));
+    return wrap;
+  }
+
+  const copy = button("Copy SQL", async () => {
+    await navigator.clipboard.writeText(b.cancelSQL + "\n" + b.terminateSQL);
+  });
+  const cancelBtn = button("Cancel query...", () => {
+    signalling = "cancel:" + b.pid;
+    renderBlocking();
+  });
+  cancelBtn.classList.add("destructive");
+  const termBtn = button("Terminate...", () => {
+    signalling = "terminate:" + b.pid;
+    renderBlocking();
+  });
+  termBtn.classList.add("destructive");
+  return buttonRow(copy, cancelBtn, termBtn);
+}
+
+async function runSignal(b, terminate) {
+  signalling = null;
+  try {
+    await window.signalBackend(b.pid, terminate);
+  } catch (err) {
+    el("dash-status").textContent = String(err);
+    return;
+  }
+  refreshDashboard();
 }
 
 const CHART_PAD = { left: 40, right: 8, top: 8, bottom: 18 };
@@ -316,7 +450,6 @@ function drawStacked(canvas, classes, buckets, opts = {}) {
     if (total > dataMax) dataMax = total;
   }
   let yMax = Math.max(1, Math.ceil(dataMax));
-  if (opts.yMaxFixed) yMax = opts.yMaxFixed;
   // A reference line (e.g. max_connections) joins the scale only when it
   // would not flatten the data.
   const ref = opts.refValue || 0;
@@ -411,7 +544,10 @@ const CONN_COLORS = {
   other: "#8e24aa",
 };
 const TPS_COLORS = { "commits/s": "#2e7d32", "rollbacks/s": "#e53935" };
-const CACHE_COLOR = "#00acc1";
+// Buffer traffic: cached reads are cheap (teal), disk reads are the ones
+// that hurt (amber). Their proportion is the cache hit ratio, made visible
+// without the ratio's blind spot at low volume.
+const IO_COLORS = { "from cache/s": "#00acc1", "from disk/s": "#fb8c00" };
 
 function drawCounters() {
   drawStacked(el("conns-chart"), dash.connClasses, dash.conns, {
@@ -423,15 +559,15 @@ function drawCounters() {
   drawStacked(el("tps-chart"), dash.tpsClasses, dash.tps, {
     colorOf: (c) => TPS_COLORS[c] || "#78909c",
   });
-  drawStacked(el("cache-chart"), dash.cacheClasses, dash.cacheHit, {
-    colorOf: () => CACHE_COLOR,
-    yMaxFixed: 100,
+  drawStacked(el("io-chart"), dash.ioClasses, dash.io, {
+    colorOf: (c) => IO_COLORS[c] || "#78909c",
   });
   renderMiniLegend("conns-legend", dash.connClasses,
     (c) => CONN_COLORS[c] || "#78909c");
   renderMiniLegend("tps-legend", dash.tpsClasses,
     (c) => TPS_COLORS[c] || "#78909c");
-  renderMiniLegend("cache-legend", dash.cacheClasses, () => CACHE_COLOR);
+  renderMiniLegend("io-legend", dash.ioClasses,
+    (c) => IO_COLORS[c] || "#78909c");
 }
 
 function renderMiniLegend(id, classes, colorOf) {
