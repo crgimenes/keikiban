@@ -45,7 +45,8 @@ and run it somewhere else instead.
 
 ## Install
 
-Requires PostgreSQL 12 or newer. Nothing to install on the server.
+Requires PostgreSQL 12 or newer and a 64-bit machine. Nothing to install on
+the server.
 
     brew install crgimenes/tap/keikiban
 
