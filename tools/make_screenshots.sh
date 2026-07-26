@@ -30,3 +30,6 @@ shot() { # shot <file> <query> <height>
 shot dashboard-dark.png "theme=dark" 1000
 shot dashboard-light.png "theme=light" 1000
 shot indexes-dark.png "theme=dark&screen=indexes" 900
+# Shorter frame for the README: GitHub scales an image to the column width,
+# and a full-page capture arrives with unreadable text.
+shot readme-dark.png "theme=dark" 655

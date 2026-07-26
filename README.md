@@ -2,6 +2,12 @@
 
 A PostgreSQL dashboard that stays up when the database does not.
 
+![keikiban showing database load by wait event under a pgbench workload](web/readme-dark.png)
+
+Those are real numbers: a `pgbench` run against a scratch database, recorded
+with `keikiban -json dashboard` and rendered by the interface itself. No
+screenshot here is drawn from invented data.
+
 The tools I had were built for browsing schemas. When something is wrong at
 3am, browsing a schema is not what I need. I need to know which query is
 eating the server, who is blocking whom, and whether that index nobody
