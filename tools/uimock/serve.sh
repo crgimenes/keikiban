@@ -15,6 +15,7 @@ DIR=$(mktemp -d)
 
 cp ui/index.html ui/app.js ui/favicon.png "$DIR/"
 cp tools/uimock/mock.js "$DIR/"
+cp -R tools/uimock/recorded "$DIR/recorded"
 # The mock must define window.* before app.js runs.
 sed -i '' 's|<script src="app.js"></script>|<script src="mock.js"></script>\n  <script src="app.js"></script>|' "$DIR/index.html"
 

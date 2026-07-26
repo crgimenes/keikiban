@@ -2,8 +2,6 @@
 
 A PostgreSQL dashboard that stays up when the database does not.
 
-![keikiban dashboard](web/dashboard-dark.png)
-
 The tools I had were built for browsing schemas. When something is wrong at
 3am, browsing a schema is not what I need. I need to know which query is
 eating the server, who is blocking whom, and whether that index nobody

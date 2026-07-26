@@ -137,7 +137,10 @@ footer {
     <img src="dashboard-dark.png" alt="keikiban dashboard: database load stacked by wait event, connections, transactions per second, buffer reads, and the blocking tree">
     <figcaption>Database load by wait event, the way RDS Performance Insights
     draws it. Sampled once a second from <code>pg_stat_activity</code>: no
-    agent on the server, no extension required.</figcaption>
+    agent on the server, no extension required. Every number on this page was
+    measured against a <code>pgbench</code> workload and recorded with
+    <code>keikiban -json dashboard</code>; nothing here is drawn from made-up
+    data.</figcaption>
   </figure>
 
   <h2>What it shows</h2>

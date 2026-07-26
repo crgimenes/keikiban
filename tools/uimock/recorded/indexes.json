@@ -1,0 +1,86 @@
+{
+  "statsReset": "",
+  "indexCacheHitPct": 94.38,
+  "tableCacheHitPct": 73.51,
+  "invalid": [],
+  "unused": [
+    {
+      "schema": "public",
+      "table": "pgbench_accounts",
+      "name": "pgbench_accounts_filler_idx",
+      "sizeBytes": 23764992,
+      "size": "23 MB",
+      "scans": 0,
+      "unique": false,
+      "definition": "CREATE INDEX pgbench_accounts_filler_idx ON public.pgbench_accounts USING btree (filler)",
+      "dropDDL": "DROP INDEX CONCURRENTLY \"public\".\"pgbench_accounts_filler_idx\";"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_history",
+      "name": "pgbench_history_tid_bid_idx",
+      "sizeBytes": 565248,
+      "size": "552 kB",
+      "scans": 0,
+      "unique": false,
+      "definition": "CREATE INDEX pgbench_history_tid_bid_idx ON public.pgbench_history USING btree (tid, bid)",
+      "dropDDL": "DROP INDEX CONCURRENTLY \"public\".\"pgbench_history_tid_bid_idx\";"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_history",
+      "name": "pgbench_history_tid_idx",
+      "sizeBytes": 237568,
+      "size": "232 kB",
+      "scans": 0,
+      "unique": false,
+      "definition": "CREATE INDEX pgbench_history_tid_idx ON public.pgbench_history USING btree (tid)",
+      "dropDDL": "DROP INDEX CONCURRENTLY \"public\".\"pgbench_history_tid_idx\";"
+    }
+  ],
+  "unusedTruncated": false,
+  "duplicates": [
+    {
+      "schema": "public",
+      "table": "pgbench_accounts",
+      "name": "pgbench_accounts_aid_idx",
+      "sizeBytes": 67403776,
+      "size": "64 MB",
+      "scans": 256318,
+      "unique": false,
+      "definition": "CREATE INDEX pgbench_accounts_aid_idx ON public.pgbench_accounts USING btree (aid)",
+      "coveredBy": "pgbench_accounts_pkey",
+      "dropDDL": "DROP INDEX CONCURRENTLY \"public\".\"pgbench_accounts_aid_idx\";"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_history",
+      "name": "pgbench_history_tid_idx",
+      "sizeBytes": 237568,
+      "size": "232 kB",
+      "scans": 0,
+      "unique": false,
+      "definition": "CREATE INDEX pgbench_history_tid_idx ON public.pgbench_history USING btree (tid)",
+      "coveredBy": "pgbench_history_tid_bid_idx",
+      "dropDDL": "DROP INDEX CONCURRENTLY \"public\".\"pgbench_history_tid_idx\";"
+    }
+  ],
+  "seqScans": [
+    {
+      "schema": "public",
+      "table": "pgbench_history",
+      "seqScans": 10,
+      "idxScans": 0,
+      "indexUsePct": 0,
+      "liveRows": 23420
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_accounts",
+      "seqScans": 6,
+      "idxScans": 430579,
+      "indexUsePct": 100,
+      "liveRows": 2999974
+    }
+  ]
+}

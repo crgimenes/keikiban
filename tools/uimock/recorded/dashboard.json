@@ -1,0 +1,3058 @@
+{
+  "connected": true,
+  "status": "sampling",
+  "title": "keikibench",
+  "url": "postgres://postgres:...@db.local:5432/keikibench",
+  "windowSeconds": 300,
+  "bucketSeconds": 3,
+  "samples": 299,
+  "sliceBy": "waits",
+  "topBy": "sql",
+  "classes": [
+    "CPU",
+    "IO:WALSync",
+    "Lock:transactionid",
+    "Client:ClientRead",
+    "LWLock:WALWrite",
+    "IO:DataFileRead",
+    "IO:WALWrite",
+    "Lock:tuple",
+    "IO:DataFileExtend",
+    "LWLock:BufferContent"
+  ],
+  "waitClasses": [
+    "CPU",
+    "IO:WALSync",
+    "Lock:transactionid",
+    "Client:ClientRead",
+    "LWLock:WALWrite",
+    "IO:DataFileRead",
+    "IO:WALWrite",
+    "Lock:tuple",
+    "IO:DataFileExtend",
+    "LWLock:BufferContent"
+  ],
+  "buckets": [
+    {
+      "t": 1785053223000,
+      "v": {
+        "IO:DataFileRead": 0.5,
+        "IO:WALSync": 0.5,
+        "LWLock:WALWrite": 0.5,
+        "Lock:transactionid": 2,
+        "Lock:tuple": 0.5
+      }
+    },
+    {
+      "t": 1785053226000,
+      "v": {
+        "CPU": 2,
+        "Client:ClientRead": 1.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 1.33
+      }
+    },
+    {
+      "t": 1785053229000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.67,
+        "IO:WALWrite": 0.33,
+        "LWLock:WALWrite": 1.67,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053232000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 1
+      }
+    },
+    {
+      "t": 1785053235000,
+      "v": {
+        "CPU": 1.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.67
+      }
+    },
+    {
+      "t": 1785053238000,
+      "v": {
+        "CPU": 1,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053241000,
+      "v": {
+        "Client:ClientRead": 1
+      }
+    },
+    {
+      "t": 1785053244000,
+      "v": {
+        "CPU": 0.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 1.33,
+        "Lock:transactionid": 1
+      }
+    },
+    {
+      "t": 1785053247000,
+      "v": {
+        "CPU": 2.67
+      }
+    },
+    {
+      "t": 1785053250000,
+      "v": {}
+    },
+    {
+      "t": 1785053253000,
+      "v": {
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053256000,
+      "v": {
+        "CPU": 1,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053259000,
+      "v": {
+        "CPU": 1.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053262000,
+      "v": {
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053265000,
+      "v": {
+        "CPU": 1.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053268000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053271000,
+      "v": {
+        "CPU": 0.67,
+        "Client:ClientRead": 0.33
+      }
+    },
+    {
+      "t": 1785053274000,
+      "v": {
+        "CPU": 0.67,
+        "Client:ClientRead": 0.33
+      }
+    },
+    {
+      "t": 1785053277000,
+      "v": {
+        "CPU": 1.67,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053280000,
+      "v": {
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053283000,
+      "v": {}
+    },
+    {
+      "t": 1785053286000,
+      "v": {}
+    },
+    {
+      "t": 1785053289000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053292000,
+      "v": {
+        "CPU": 1.67,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053295000,
+      "v": {
+        "CPU": 1.33
+      }
+    },
+    {
+      "t": 1785053298000,
+      "v": {
+        "CPU": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053301000,
+      "v": {
+        "CPU": 3.67,
+        "IO:DataFileRead": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053304000,
+      "v": {
+        "CPU": 0.67,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053307000,
+      "v": {}
+    },
+    {
+      "t": 1785053310000,
+      "v": {}
+    },
+    {
+      "t": 1785053313000,
+      "v": {
+        "CPU": 0.33
+      }
+    },
+    {
+      "t": 1785053316000,
+      "v": {
+        "IO:DataFileExtend": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053319000,
+      "v": {
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053322000,
+      "v": {
+        "CPU": 1,
+        "Client:ClientRead": 1,
+        "LWLock:BufferContent": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053325000,
+      "v": {
+        "CPU": 1,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053328000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053331000,
+      "v": {
+        "CPU": 0.67,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053334000,
+      "v": {
+        "CPU": 2.33,
+        "IO:DataFileRead": 0.67,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053337000,
+      "v": {
+        "CPU": 1,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.67,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053340000,
+      "v": {
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053343000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053346000,
+      "v": {
+        "CPU": 1,
+        "IO:DataFileRead": 1,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053349000,
+      "v": {
+        "CPU": 2.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33,
+        "Lock:tuple": 0.33
+      }
+    },
+    {
+      "t": 1785053352000,
+      "v": {
+        "CPU": 0.67,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053355000,
+      "v": {
+        "CPU": 1.33,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053358000,
+      "v": {
+        "CPU": 0.67,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053361000,
+      "v": {
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053364000,
+      "v": {
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053367000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053370000,
+      "v": {}
+    },
+    {
+      "t": 1785053373000,
+      "v": {
+        "CPU": 1,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053376000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053379000,
+      "v": {}
+    },
+    {
+      "t": 1785053382000,
+      "v": {
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053385000,
+      "v": {
+        "CPU": 1,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053388000,
+      "v": {
+        "CPU": 1.33,
+        "IO:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053391000,
+      "v": {
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.67,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053394000,
+      "v": {
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053397000,
+      "v": {
+        "CPU": 2,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 1,
+        "LWLock:WALWrite": 0.67,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053400000,
+      "v": {
+        "CPU": 4,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053403000,
+      "v": {
+        "CPU": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053406000,
+      "v": {
+        "CPU": 0.67,
+        "IO:DataFileExtend": 0.33
+      }
+    },
+    {
+      "t": 1785053409000,
+      "v": {
+        "CPU": 1,
+        "LWLock:WALWrite": 0.67,
+        "Lock:transactionid": 0.67
+      }
+    },
+    {
+      "t": 1785053412000,
+      "v": {
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053415000,
+      "v": {
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053418000,
+      "v": {}
+    },
+    {
+      "t": 1785053421000,
+      "v": {}
+    },
+    {
+      "t": 1785053424000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 2.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 1
+      }
+    },
+    {
+      "t": 1785053427000,
+      "v": {
+        "CPU": 0.33,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053430000,
+      "v": {
+        "CPU": 2,
+        "Client:ClientRead": 0.67,
+        "IO:WALSync": 0.67
+      }
+    },
+    {
+      "t": 1785053433000,
+      "v": {
+        "CPU": 1.67,
+        "Client:ClientRead": 1,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053436000,
+      "v": {
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053439000,
+      "v": {
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 2,
+        "Lock:transactionid": 1
+      }
+    },
+    {
+      "t": 1785053442000,
+      "v": {
+        "CPU": 1,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.67
+      }
+    },
+    {
+      "t": 1785053445000,
+      "v": {
+        "CPU": 1.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053448000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 0.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053451000,
+      "v": {
+        "CPU": 3,
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.67
+      }
+    },
+    {
+      "t": 1785053454000,
+      "v": {
+        "CPU": 2,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053457000,
+      "v": {
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053460000,
+      "v": {
+        "CPU": 1.33,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.33
+      }
+    },
+    {
+      "t": 1785053463000,
+      "v": {
+        "CPU": 2,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.67,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053466000,
+      "v": {}
+    },
+    {
+      "t": 1785053469000,
+      "v": {
+        "CPU": 1.67,
+        "IO:WALSync": 0.33,
+        "LWLock:BufferContent": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053472000,
+      "v": {
+        "CPU": 2,
+        "Client:ClientRead": 0.33,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053475000,
+      "v": {
+        "CPU": 1.33,
+        "Client:ClientRead": 0.67,
+        "IO:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053478000,
+      "v": {
+        "CPU": 1,
+        "Client:ClientRead": 1.67,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053481000,
+      "v": {
+        "CPU": 1.33,
+        "IO:WALSync": 0.67,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053484000,
+      "v": {
+        "CPU": 0.33,
+        "Client:ClientRead": 3
+      }
+    },
+    {
+      "t": 1785053487000,
+      "v": {
+        "CPU": 0.67,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.67,
+        "IO:WALSync": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053490000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALWrite": 0.33,
+        "LWLock:WALWrite": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053493000,
+      "v": {
+        "CPU": 0.67,
+        "IO:DataFileRead": 1,
+        "IO:WALSync": 0.33,
+        "LWLock:WALWrite": 0.67
+      }
+    },
+    {
+      "t": 1785053496000,
+      "v": {}
+    },
+    {
+      "t": 1785053499000,
+      "v": {
+        "CPU": 1,
+        "Client:ClientRead": 0.33,
+        "IO:DataFileRead": 0.33
+      }
+    },
+    {
+      "t": 1785053502000,
+      "v": {
+        "CPU": 0.67,
+        "Client:ClientRead": 1,
+        "IO:DataFileRead": 0.67,
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 0.67,
+        "Lock:transactionid": 0.33,
+        "Lock:tuple": 0.33
+      }
+    },
+    {
+      "t": 1785053505000,
+      "v": {
+        "CPU": 2.33,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053508000,
+      "v": {
+        "CPU": 1,
+        "IO:DataFileRead": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    },
+    {
+      "t": 1785053511000,
+      "v": {}
+    },
+    {
+      "t": 1785053514000,
+      "v": {
+        "IO:WALSync": 0.67,
+        "LWLock:WALWrite": 1,
+        "Lock:transactionid": 1
+      }
+    },
+    {
+      "t": 1785053517000,
+      "v": {
+        "CPU": 1.67,
+        "IO:DataFileRead": 0.33,
+        "IO:WALSync": 0.33
+      }
+    },
+    {
+      "t": 1785053520000,
+      "v": {
+        "CPU": 3.33,
+        "IO:DataFileRead": 0.33,
+        "Lock:transactionid": 0.33
+      }
+    }
+  ],
+  "topSQL": [
+    {
+      "query": "SELECT abalance FROM pgbench_accounts WHERE aid = 1935165;",
+      "aas": 0.56,
+      "pct": 28.14,
+      "byClass": {
+        "CPU": 0.38,
+        "Client:ClientRead": 0.08,
+        "IO:DataFileRead": 0.1
+      },
+      "hasStats": true,
+      "callsPS": 329.68,
+      "rowsPerCall": 1,
+      "msPerCall": 0.14
+    },
+    {
+      "query": "END;",
+      "aas": 0.47,
+      "pct": 23.45,
+      "byClass": {
+        "CPU": 0.02,
+        "Client:ClientRead": 0.01,
+        "IO:WALSync": 0.24,
+        "IO:WALWrite": 0.01,
+        "LWLock:WALWrite": 0.19
+      },
+      "hasStats": false,
+      "callsPS": 0,
+      "rowsPerCall": 0,
+      "msPerCall": 0
+    },
+    {
+      "query": "UPDATE pgbench_branches SET bbalance = bbalance + 4772 WHERE bid = 19;",
+      "aas": 0.33,
+      "pct": 16.42,
+      "byClass": {
+        "CPU": 0.08,
+        "Client:ClientRead": 0.03,
+        "LWLock:BufferContent": 0.01,
+        "Lock:transactionid": 0.2,
+        "Lock:tuple": 0.01
+      },
+      "hasStats": true,
+      "callsPS": 71.92,
+      "rowsPerCall": 1,
+      "msPerCall": 2.32
+    },
+    {
+      "query": "UPDATE pgbench_accounts SET abalance = abalance + -3874 WHERE aid = 2053441;",
+      "aas": 0.16,
+      "pct": 8.21,
+      "byClass": {
+        "CPU": 0.11,
+        "Client:ClientRead": 0.01,
+        "IO:DataFileExtend": 0,
+        "IO:DataFileRead": 0.04
+      },
+      "hasStats": true,
+      "callsPS": 71.91,
+      "rowsPerCall": 1,
+      "msPerCall": 0.36
+    },
+    {
+      "query": "UPDATE pgbench_tellers SET tbalance = tbalance + -2174 WHERE tid = 131;",
+      "aas": 0.16,
+      "pct": 7.87,
+      "byClass": {
+        "CPU": 0.1,
+        "Client:ClientRead": 0.01,
+        "Lock:transactionid": 0.04
+      },
+      "hasStats": true,
+      "callsPS": 71.92,
+      "rowsPerCall": 1,
+      "msPerCall": 0.53
+    },
+    {
+      "query": "INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (129, 30, 2613124, -770, CURRENT_TIMESTAMP);",
+      "aas": 0.09,
+      "pct": 4.36,
+      "byClass": {
+        "CPU": 0.07,
+        "Client:ClientRead": 0.01,
+        "IO:DataFileExtend": 0
+      },
+      "hasStats": true,
+      "callsPS": 71.91,
+      "rowsPerCall": 1,
+      "msPerCall": 0.09
+    },
+    {
+      "query": "BEGIN;",
+      "aas": 0.01,
+      "pct": 0.67,
+      "byClass": {
+        "CPU": 0,
+        "Client:ClientRead": 0.01
+      },
+      "hasStats": false,
+      "callsPS": 0,
+      "rowsPerCall": 0,
+      "msPerCall": 0
+    },
+    {
+      "query": "END;",
+      "aas": 0.01,
+      "pct": 0.5,
+      "byClass": {
+        "CPU": 0,
+        "IO:WALSync": 0,
+        "LWLock:WALWrite": 0
+      },
+      "hasStats": false,
+      "callsPS": 0,
+      "rowsPerCall": 0,
+      "msPerCall": 0
+    },
+    {
+      "query": "INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (115, 19, 2926497, -694, CURRENT_TIMESTAMP);",
+      "aas": 0,
+      "pct": 0.17,
+      "byClass": {
+        "CPU": 0
+      },
+      "hasStats": false,
+      "callsPS": 0,
+      "rowsPerCall": 0,
+      "msPerCall": 0
+    },
+    {
+      "query": "INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (115, 8, 271596, 769, CURRENT_TIMESTAMP);",
+      "aas": 0,
+      "pct": 0.17,
+      "byClass": {
+        "CPU": 0
+      },
+      "hasStats": false,
+      "callsPS": 0,
+      "rowsPerCall": 0,
+      "msPerCall": 0
+    }
+  ],
+  "missingExtensions": [],
+  "missingPreloaded": [],
+  "connClasses": [
+    "active",
+    "idle in transaction",
+    "idle",
+    "other"
+  ],
+  "conns": [
+    {
+      "t": 1785053223000,
+      "v": {
+        "active": 4,
+        "idle": 15.5,
+        "idle in transaction": 14.5
+      }
+    },
+    {
+      "t": 1785053226000,
+      "v": {
+        "active": 5.33,
+        "idle": 13,
+        "idle in transaction": 15.67
+      }
+    },
+    {
+      "t": 1785053229000,
+      "v": {
+        "active": 4,
+        "idle": 12,
+        "idle in transaction": 12
+      }
+    },
+    {
+      "t": 1785053232000,
+      "v": {
+        "active": 1.67,
+        "idle": 6,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053235000,
+      "v": {
+        "active": 3.33,
+        "idle": 6,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053238000,
+      "v": {
+        "active": 1.33,
+        "idle": 7.33,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053241000,
+      "v": {
+        "active": 1,
+        "idle": 7.33,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053244000,
+      "v": {
+        "active": 4,
+        "idle": 6,
+        "idle in transaction": 6
+      }
+    },
+    {
+      "t": 1785053247000,
+      "v": {
+        "active": 2.67,
+        "idle": 7.33,
+        "idle in transaction": 6
+      }
+    },
+    {
+      "t": 1785053250000,
+      "v": {
+        "idle": 8.33,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053253000,
+      "v": {
+        "active": 0.67,
+        "idle": 7,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053256000,
+      "v": {
+        "active": 2.33,
+        "idle": 8,
+        "idle in transaction": 5.67
+      }
+    },
+    {
+      "t": 1785053259000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053262000,
+      "v": {
+        "active": 0.33,
+        "idle": 7.33,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053265000,
+      "v": {
+        "active": 2.67,
+        "idle": 6,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053268000,
+      "v": {
+        "active": 3.67,
+        "idle": 7,
+        "idle in transaction": 5.33
+      }
+    },
+    {
+      "t": 1785053271000,
+      "v": {
+        "active": 1,
+        "idle": 7.33,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053274000,
+      "v": {
+        "active": 1,
+        "idle": 7,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053277000,
+      "v": {
+        "active": 3.33,
+        "idle": 6.33,
+        "idle in transaction": 6.33
+      }
+    },
+    {
+      "t": 1785053280000,
+      "v": {
+        "active": 0.33,
+        "idle": 7.67,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053283000,
+      "v": {
+        "idle": 7,
+        "idle in transaction": 9
+      }
+    },
+    {
+      "t": 1785053286000,
+      "v": {
+        "idle": 7.67,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053289000,
+      "v": {
+        "active": 1.33,
+        "idle": 6.33,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053292000,
+      "v": {
+        "active": 2,
+        "idle": 6.67,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053295000,
+      "v": {
+        "active": 1.33,
+        "idle": 7,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053298000,
+      "v": {
+        "active": 1.33,
+        "idle": 7.33,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053301000,
+      "v": {
+        "active": 4.67,
+        "idle": 5.67,
+        "idle in transaction": 5.67
+      }
+    },
+    {
+      "t": 1785053304000,
+      "v": {
+        "active": 1.67,
+        "idle": 6.33,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053307000,
+      "v": {
+        "idle": 7.33,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053310000,
+      "v": {
+        "idle": 6.33,
+        "idle in transaction": 9.67
+      }
+    },
+    {
+      "t": 1785053313000,
+      "v": {
+        "active": 0.33,
+        "idle": 7.67,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053316000,
+      "v": {
+        "active": 1.33,
+        "idle": 7,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053319000,
+      "v": {
+        "active": 0.33,
+        "idle": 7.67,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053322000,
+      "v": {
+        "active": 3,
+        "idle": 6.67,
+        "idle in transaction": 6.33
+      }
+    },
+    {
+      "t": 1785053325000,
+      "v": {
+        "active": 2.33,
+        "idle": 7,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053328000,
+      "v": {
+        "active": 3,
+        "idle": 5.67,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053331000,
+      "v": {
+        "active": 1.67,
+        "idle": 7,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053334000,
+      "v": {
+        "active": 3.33,
+        "idle": 5.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053337000,
+      "v": {
+        "active": 2.67,
+        "idle": 6,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053340000,
+      "v": {
+        "active": 0.33,
+        "idle": 6.33,
+        "idle in transaction": 9.33
+      }
+    },
+    {
+      "t": 1785053343000,
+      "v": {
+        "active": 3.33,
+        "idle": 6.67,
+        "idle in transaction": 6
+      }
+    },
+    {
+      "t": 1785053346000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053349000,
+      "v": {
+        "active": 4,
+        "idle": 5.33,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053352000,
+      "v": {
+        "active": 1.67,
+        "idle": 6.67,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053355000,
+      "v": {
+        "active": 1.67,
+        "idle": 6.33,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053358000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053361000,
+      "v": {
+        "active": 1,
+        "idle": 7.67,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053364000,
+      "v": {
+        "active": 0.33,
+        "idle": 7,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053367000,
+      "v": {
+        "active": 3,
+        "idle": 6.67,
+        "idle in transaction": 6.33
+      }
+    },
+    {
+      "t": 1785053370000,
+      "v": {
+        "idle": 7.67,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053373000,
+      "v": {
+        "active": 1.33,
+        "idle": 6.33,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053376000,
+      "v": {
+        "active": 1.67,
+        "idle": 7.33,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053379000,
+      "v": {
+        "idle": 9.33,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053382000,
+      "v": {
+        "active": 0.33,
+        "idle": 7,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053385000,
+      "v": {
+        "active": 1.33,
+        "idle": 5.67,
+        "idle in transaction": 9
+      }
+    },
+    {
+      "t": 1785053388000,
+      "v": {
+        "active": 1.67,
+        "idle": 6.67,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053391000,
+      "v": {
+        "active": 1.33,
+        "idle": 8,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053394000,
+      "v": {
+        "active": 2,
+        "idle": 6,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053397000,
+      "v": {
+        "active": 4.33,
+        "idle": 5,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053400000,
+      "v": {
+        "active": 4.33,
+        "idle": 4.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053403000,
+      "v": {
+        "active": 0.67,
+        "idle": 7,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053406000,
+      "v": {
+        "active": 1,
+        "idle": 7.33,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053409000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.33,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053412000,
+      "v": {
+        "active": 0.67,
+        "idle": 6.67,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053415000,
+      "v": {
+        "active": 0.67,
+        "idle": 7.33,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053418000,
+      "v": {
+        "idle": 7,
+        "idle in transaction": 9
+      }
+    },
+    {
+      "t": 1785053421000,
+      "v": {
+        "idle": 7.33,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053424000,
+      "v": {
+        "active": 4.67,
+        "idle": 4.67,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053427000,
+      "v": {
+        "active": 0.67,
+        "idle": 7.67,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053430000,
+      "v": {
+        "active": 3.33,
+        "idle": 6,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053433000,
+      "v": {
+        "active": 4,
+        "idle": 5.33,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053436000,
+      "v": {
+        "active": 0.67,
+        "idle": 6.33,
+        "idle in transaction": 9
+      }
+    },
+    {
+      "t": 1785053439000,
+      "v": {
+        "active": 3.33,
+        "idle": 7.33,
+        "idle in transaction": 5.33
+      }
+    },
+    {
+      "t": 1785053442000,
+      "v": {
+        "active": 2,
+        "idle": 6.67,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053445000,
+      "v": {
+        "active": 1.67,
+        "idle": 6.33,
+        "idle in transaction": 8
+      }
+    },
+    {
+      "t": 1785053448000,
+      "v": {
+        "active": 2,
+        "idle": 6.33,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053451000,
+      "v": {
+        "active": 4.67,
+        "idle": 5.67,
+        "idle in transaction": 5.67
+      }
+    },
+    {
+      "t": 1785053454000,
+      "v": {
+        "active": 3.67,
+        "idle": 5,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053457000,
+      "v": {
+        "active": 0.33,
+        "idle": 7.33,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053460000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053463000,
+      "v": {
+        "active": 3.33,
+        "idle": 5.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053466000,
+      "v": {
+        "idle": 7,
+        "idle in transaction": 9
+      }
+    },
+    {
+      "t": 1785053469000,
+      "v": {
+        "active": 2.67,
+        "idle": 5.67,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053472000,
+      "v": {
+        "active": 3,
+        "idle": 5.67,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053475000,
+      "v": {
+        "active": 2.67,
+        "idle": 7.33,
+        "idle in transaction": 6
+      }
+    },
+    {
+      "t": 1785053478000,
+      "v": {
+        "active": 3,
+        "idle": 6.33,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053481000,
+      "v": {
+        "active": 2.33,
+        "idle": 5.33,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053484000,
+      "v": {
+        "active": 3.33,
+        "idle": 5.67,
+        "idle in transaction": 7
+      }
+    },
+    {
+      "t": 1785053487000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.33,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053490000,
+      "v": {
+        "active": 3.33,
+        "idle": 6,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053493000,
+      "v": {
+        "active": 2.67,
+        "idle": 5.67,
+        "idle in transaction": 7.67
+      }
+    },
+    {
+      "t": 1785053496000,
+      "v": {
+        "idle": 7.67,
+        "idle in transaction": 8.33
+      }
+    },
+    {
+      "t": 1785053499000,
+      "v": {
+        "active": 1.67,
+        "idle": 7.67,
+        "idle in transaction": 6.67
+      }
+    },
+    {
+      "t": 1785053502000,
+      "v": {
+        "active": 4.33,
+        "idle": 5.33,
+        "idle in transaction": 6.33
+      }
+    },
+    {
+      "t": 1785053505000,
+      "v": {
+        "active": 2.67,
+        "idle": 7,
+        "idle in transaction": 6.33
+      }
+    },
+    {
+      "t": 1785053508000,
+      "v": {
+        "active": 1.67,
+        "idle": 7,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053511000,
+      "v": {
+        "idle": 7.33,
+        "idle in transaction": 8.67
+      }
+    },
+    {
+      "t": 1785053514000,
+      "v": {
+        "active": 2.67,
+        "idle": 7.33,
+        "idle in transaction": 6
+      }
+    },
+    {
+      "t": 1785053517000,
+      "v": {
+        "active": 2.33,
+        "idle": 6.33,
+        "idle in transaction": 7.33
+      }
+    },
+    {
+      "t": 1785053520000,
+      "v": {
+        "active": 4,
+        "idle": 6,
+        "idle in transaction": 6
+      }
+    }
+  ],
+  "maxConnections": 100,
+  "databaseCount": 2,
+  "tpsClasses": [
+    "commits/s",
+    "rollbacks/s"
+  ],
+  "tps": [
+    {
+      "t": 1785053223000,
+      "v": {
+        "commits/s": 760.99
+      }
+    },
+    {
+      "t": 1785053226000,
+      "v": {
+        "commits/s": 786.67
+      }
+    },
+    {
+      "t": 1785053229000,
+      "v": {
+        "commits/s": 740
+      }
+    },
+    {
+      "t": 1785053232000,
+      "v": {
+        "commits/s": 366
+      }
+    },
+    {
+      "t": 1785053235000,
+      "v": {
+        "commits/s": 342
+      }
+    },
+    {
+      "t": 1785053238000,
+      "v": {
+        "commits/s": 276
+      }
+    },
+    {
+      "t": 1785053241000,
+      "v": {
+        "commits/s": 366.34
+      }
+    },
+    {
+      "t": 1785053244000,
+      "v": {
+        "commits/s": 364.34
+      }
+    },
+    {
+      "t": 1785053247000,
+      "v": {
+        "commits/s": 336.1
+      }
+    },
+    {
+      "t": 1785053250000,
+      "v": {
+        "commits/s": 361.91
+      }
+    },
+    {
+      "t": 1785053253000,
+      "v": {
+        "commits/s": 354.34
+      }
+    },
+    {
+      "t": 1785053256000,
+      "v": {
+        "commits/s": 358
+      }
+    },
+    {
+      "t": 1785053259000,
+      "v": {
+        "commits/s": 360.73
+      }
+    },
+    {
+      "t": 1785053262000,
+      "v": {
+        "commits/s": 278.31
+      }
+    },
+    {
+      "t": 1785053265000,
+      "v": {
+        "commits/s": 344
+      }
+    },
+    {
+      "t": 1785053268000,
+      "v": {
+        "commits/s": 376.34
+      }
+    },
+    {
+      "t": 1785053271000,
+      "v": {
+        "commits/s": 356.66
+      }
+    },
+    {
+      "t": 1785053274000,
+      "v": {
+        "commits/s": 352.67
+      }
+    },
+    {
+      "t": 1785053277000,
+      "v": {
+        "commits/s": 366.67
+      }
+    },
+    {
+      "t": 1785053280000,
+      "v": {
+        "commits/s": 355.44
+      }
+    },
+    {
+      "t": 1785053283000,
+      "v": {
+        "commits/s": 272.31
+      }
+    },
+    {
+      "t": 1785053286000,
+      "v": {
+        "commits/s": 343.33
+      }
+    },
+    {
+      "t": 1785053289000,
+      "v": {
+        "commits/s": 356.34
+      }
+    },
+    {
+      "t": 1785053292000,
+      "v": {
+        "commits/s": 375.66
+      }
+    },
+    {
+      "t": 1785053295000,
+      "v": {
+        "commits/s": 337.33
+      }
+    },
+    {
+      "t": 1785053298000,
+      "v": {
+        "commits/s": 356
+      }
+    },
+    {
+      "t": 1785053301000,
+      "v": {
+        "commits/s": 358
+      }
+    },
+    {
+      "t": 1785053304000,
+      "v": {
+        "commits/s": 260.4
+      }
+    },
+    {
+      "t": 1785053307000,
+      "v": {
+        "commits/s": 354.59
+      }
+    },
+    {
+      "t": 1785053310000,
+      "v": {
+        "commits/s": 342.67
+      }
+    },
+    {
+      "t": 1785053313000,
+      "v": {
+        "commits/s": 368
+      }
+    },
+    {
+      "t": 1785053316000,
+      "v": {
+        "commits/s": 352.33
+      }
+    },
+    {
+      "t": 1785053319000,
+      "v": {
+        "commits/s": 341
+      }
+    },
+    {
+      "t": 1785053322000,
+      "v": {
+        "commits/s": 367.33
+      }
+    },
+    {
+      "t": 1785053325000,
+      "v": {
+        "commits/s": 255.67
+      }
+    },
+    {
+      "t": 1785053328000,
+      "v": {
+        "commits/s": 355
+      }
+    },
+    {
+      "t": 1785053331000,
+      "v": {
+        "commits/s": 340.67
+      }
+    },
+    {
+      "t": 1785053334000,
+      "v": {
+        "commits/s": 353.07
+      }
+    },
+    {
+      "t": 1785053337000,
+      "v": {
+        "commits/s": 365.59
+      }
+    },
+    {
+      "t": 1785053340000,
+      "v": {
+        "commits/s": 345
+      }
+    },
+    {
+      "t": 1785053343000,
+      "v": {
+        "commits/s": 361.33
+      }
+    },
+    {
+      "t": 1785053346000,
+      "v": {
+        "commits/s": 252.33
+      }
+    },
+    {
+      "t": 1785053349000,
+      "v": {
+        "commits/s": 355
+      }
+    },
+    {
+      "t": 1785053352000,
+      "v": {
+        "commits/s": 358.66
+      }
+    },
+    {
+      "t": 1785053355000,
+      "v": {
+        "commits/s": 349
+      }
+    },
+    {
+      "t": 1785053358000,
+      "v": {
+        "commits/s": 347
+      }
+    },
+    {
+      "t": 1785053361000,
+      "v": {
+        "commits/s": 296
+      }
+    },
+    {
+      "t": 1785053364000,
+      "v": {
+        "commits/s": 251
+      }
+    },
+    {
+      "t": 1785053367000,
+      "v": {
+        "commits/s": 342.33
+      }
+    },
+    {
+      "t": 1785053370000,
+      "v": {
+        "commits/s": 313.66
+      }
+    },
+    {
+      "t": 1785053373000,
+      "v": {
+        "commits/s": 342.73
+      }
+    },
+    {
+      "t": 1785053376000,
+      "v": {
+        "commits/s": 234.53
+      }
+    },
+    {
+      "t": 1785053379000,
+      "v": {
+        "commits/s": 352.66
+      }
+    },
+    {
+      "t": 1785053382000,
+      "v": {
+        "commits/s": 260.68
+      }
+    },
+    {
+      "t": 1785053385000,
+      "v": {
+        "commits/s": 281.43
+      }
+    },
+    {
+      "t": 1785053388000,
+      "v": {
+        "commits/s": 361.28
+      }
+    },
+    {
+      "t": 1785053391000,
+      "v": {
+        "commits/s": 349.33
+      }
+    },
+    {
+      "t": 1785053394000,
+      "v": {
+        "commits/s": 343.67
+      }
+    },
+    {
+      "t": 1785053397000,
+      "v": {
+        "commits/s": 360.33
+      }
+    },
+    {
+      "t": 1785053400000,
+      "v": {
+        "commits/s": 247.67
+      }
+    },
+    {
+      "t": 1785053403000,
+      "v": {
+        "commits/s": 367.04
+      }
+    },
+    {
+      "t": 1785053406000,
+      "v": {
+        "commits/s": 346.63
+      }
+    },
+    {
+      "t": 1785053409000,
+      "v": {
+        "commits/s": 350.67
+      }
+    },
+    {
+      "t": 1785053412000,
+      "v": {
+        "commits/s": 358
+      }
+    },
+    {
+      "t": 1785053415000,
+      "v": {
+        "commits/s": 337.33
+      }
+    },
+    {
+      "t": 1785053418000,
+      "v": {
+        "commits/s": 353.66
+      }
+    },
+    {
+      "t": 1785053421000,
+      "v": {
+        "commits/s": 241.67
+      }
+    },
+    {
+      "t": 1785053424000,
+      "v": {
+        "commits/s": 334.33
+      }
+    },
+    {
+      "t": 1785053427000,
+      "v": {
+        "commits/s": 331.33
+      }
+    },
+    {
+      "t": 1785053430000,
+      "v": {
+        "commits/s": 323
+      }
+    },
+    {
+      "t": 1785053433000,
+      "v": {
+        "commits/s": 366.33
+      }
+    },
+    {
+      "t": 1785053436000,
+      "v": {
+        "commits/s": 343.41
+      }
+    },
+    {
+      "t": 1785053439000,
+      "v": {
+        "commits/s": 344.25
+      }
+    },
+    {
+      "t": 1785053442000,
+      "v": {
+        "commits/s": 360.01
+      }
+    },
+    {
+      "t": 1785053445000,
+      "v": {
+        "commits/s": 211.33
+      }
+    },
+    {
+      "t": 1785053448000,
+      "v": {
+        "commits/s": 360.78
+      }
+    },
+    {
+      "t": 1785053451000,
+      "v": {
+        "commits/s": 347.27
+      }
+    },
+    {
+      "t": 1785053454000,
+      "v": {
+        "commits/s": 358.95
+      }
+    },
+    {
+      "t": 1785053457000,
+      "v": {
+        "commits/s": 362.67
+      }
+    },
+    {
+      "t": 1785053460000,
+      "v": {
+        "commits/s": 318.67
+      }
+    },
+    {
+      "t": 1785053463000,
+      "v": {
+        "commits/s": 368.67
+      }
+    },
+    {
+      "t": 1785053466000,
+      "v": {
+        "commits/s": 253.67
+      }
+    },
+    {
+      "t": 1785053469000,
+      "v": {
+        "commits/s": 357.03
+      }
+    },
+    {
+      "t": 1785053472000,
+      "v": {
+        "commits/s": 346.63
+      }
+    },
+    {
+      "t": 1785053475000,
+      "v": {
+        "commits/s": 308.67
+      }
+    },
+    {
+      "t": 1785053478000,
+      "v": {
+        "commits/s": 358.67
+      }
+    },
+    {
+      "t": 1785053481000,
+      "v": {
+        "commits/s": 333.02
+      }
+    },
+    {
+      "t": 1785053484000,
+      "v": {
+        "commits/s": 351.98
+      }
+    },
+    {
+      "t": 1785053487000,
+      "v": {
+        "commits/s": 262.67
+      }
+    },
+    {
+      "t": 1785053490000,
+      "v": {
+        "commits/s": 347
+      }
+    },
+    {
+      "t": 1785053493000,
+      "v": {
+        "commits/s": 360
+      }
+    },
+    {
+      "t": 1785053496000,
+      "v": {
+        "commits/s": 338.67
+      }
+    },
+    {
+      "t": 1785053499000,
+      "v": {
+        "commits/s": 352.03
+      }
+    },
+    {
+      "t": 1785053502000,
+      "v": {
+        "commits/s": 349.73
+      }
+    },
+    {
+      "t": 1785053505000,
+      "v": {
+        "commits/s": 339.92
+      }
+    },
+    {
+      "t": 1785053508000,
+      "v": {
+        "commits/s": 264.71
+      }
+    },
+    {
+      "t": 1785053511000,
+      "v": {
+        "commits/s": 327.33
+      }
+    },
+    {
+      "t": 1785053514000,
+      "v": {
+        "commits/s": 342.89
+      }
+    },
+    {
+      "t": 1785053517000,
+      "v": {
+        "commits/s": 354.33
+      }
+    },
+    {
+      "t": 1785053520000,
+      "v": {
+        "commits/s": 358
+      }
+    }
+  ],
+  "ioClasses": [
+    "from cache/s",
+    "from disk/s"
+  ],
+  "io": [
+    {
+      "t": 1785053223000,
+      "v": {
+        "from cache/s": 5512.92,
+        "from disk/s": 846.99
+      }
+    },
+    {
+      "t": 1785053226000,
+      "v": {
+        "from cache/s": 6521.03,
+        "from disk/s": 863.01
+      }
+    },
+    {
+      "t": 1785053229000,
+      "v": {
+        "from cache/s": 5834.34,
+        "from disk/s": 811.33
+      }
+    },
+    {
+      "t": 1785053232000,
+      "v": {
+        "from cache/s": 3041.02,
+        "from disk/s": 407
+      }
+    },
+    {
+      "t": 1785053235000,
+      "v": {
+        "from cache/s": 2529,
+        "from disk/s": 381.67
+      }
+    },
+    {
+      "t": 1785053238000,
+      "v": {
+        "from cache/s": 2704.32,
+        "from disk/s": 310.67
+      }
+    },
+    {
+      "t": 1785053241000,
+      "v": {
+        "from cache/s": 3037.7,
+        "from disk/s": 400.67
+      }
+    },
+    {
+      "t": 1785053244000,
+      "v": {
+        "from cache/s": 2838.33,
+        "from disk/s": 408.33
+      }
+    },
+    {
+      "t": 1785053247000,
+      "v": {
+        "from cache/s": 2698.45,
+        "from disk/s": 361.77
+      }
+    },
+    {
+      "t": 1785053250000,
+      "v": {
+        "from cache/s": 2958.53,
+        "from disk/s": 395.56
+      }
+    },
+    {
+      "t": 1785053253000,
+      "v": {
+        "from cache/s": 2891.05,
+        "from disk/s": 384.34
+      }
+    },
+    {
+      "t": 1785053256000,
+      "v": {
+        "from cache/s": 2721.32,
+        "from disk/s": 408.33
+      }
+    },
+    {
+      "t": 1785053259000,
+      "v": {
+        "from cache/s": 2956.55,
+        "from disk/s": 390.74
+      }
+    },
+    {
+      "t": 1785053262000,
+      "v": {
+        "from cache/s": 3270.22,
+        "from disk/s": 312.97
+      }
+    },
+    {
+      "t": 1785053265000,
+      "v": {
+        "from cache/s": 2564.66,
+        "from disk/s": 392
+      }
+    },
+    {
+      "t": 1785053268000,
+      "v": {
+        "from cache/s": 3029.1,
+        "from disk/s": 407.68
+      }
+    },
+    {
+      "t": 1785053271000,
+      "v": {
+        "from cache/s": 2873.6,
+        "from disk/s": 394.99
+      }
+    },
+    {
+      "t": 1785053274000,
+      "v": {
+        "from cache/s": 2803.41,
+        "from disk/s": 391.34
+      }
+    },
+    {
+      "t": 1785053277000,
+      "v": {
+        "from cache/s": 2722.01,
+        "from disk/s": 395
+      }
+    },
+    {
+      "t": 1785053280000,
+      "v": {
+        "from cache/s": 2879.47,
+        "from disk/s": 396.45
+      }
+    },
+    {
+      "t": 1785053283000,
+      "v": {
+        "from cache/s": 2609.72,
+        "from disk/s": 301.64
+      }
+    },
+    {
+      "t": 1785053286000,
+      "v": {
+        "from cache/s": 2659.28,
+        "from disk/s": 359
+      }
+    },
+    {
+      "t": 1785053289000,
+      "v": {
+        "from cache/s": 2908.01,
+        "from disk/s": 392.99
+      }
+    },
+    {
+      "t": 1785053292000,
+      "v": {
+        "from cache/s": 3090.64,
+        "from disk/s": 420.33
+      }
+    },
+    {
+      "t": 1785053295000,
+      "v": {
+        "from cache/s": 2609.18,
+        "from disk/s": 366.33
+      }
+    },
+    {
+      "t": 1785053298000,
+      "v": {
+        "from cache/s": 2793.04,
+        "from disk/s": 396
+      }
+    },
+    {
+      "t": 1785053301000,
+      "v": {
+        "from cache/s": 2809.98,
+        "from disk/s": 382.33
+      }
+    },
+    {
+      "t": 1785053304000,
+      "v": {
+        "from cache/s": 2585.57,
+        "from disk/s": 279.07
+      }
+    },
+    {
+      "t": 1785053307000,
+      "v": {
+        "from cache/s": 2828.69,
+        "from disk/s": 384.92
+      }
+    },
+    {
+      "t": 1785053310000,
+      "v": {
+        "from cache/s": 2587.66,
+        "from disk/s": 369.33
+      }
+    },
+    {
+      "t": 1785053313000,
+      "v": {
+        "from cache/s": 2958,
+        "from disk/s": 407.33
+      }
+    },
+    {
+      "t": 1785053316000,
+      "v": {
+        "from cache/s": 2863.33,
+        "from disk/s": 387.67
+      }
+    },
+    {
+      "t": 1785053319000,
+      "v": {
+        "from cache/s": 2551,
+        "from disk/s": 367
+      }
+    },
+    {
+      "t": 1785053322000,
+      "v": {
+        "from cache/s": 3447.96,
+        "from disk/s": 414.99
+      }
+    },
+    {
+      "t": 1785053325000,
+      "v": {
+        "from cache/s": 2541.36,
+        "from disk/s": 271
+      }
+    },
+    {
+      "t": 1785053328000,
+      "v": {
+        "from cache/s": 2634,
+        "from disk/s": 381
+      }
+    },
+    {
+      "t": 1785053331000,
+      "v": {
+        "from cache/s": 2675.67,
+        "from disk/s": 359.67
+      }
+    },
+    {
+      "t": 1785053334000,
+      "v": {
+        "from cache/s": 2854.59,
+        "from disk/s": 381.07
+      }
+    },
+    {
+      "t": 1785053337000,
+      "v": {
+        "from cache/s": 2811.65,
+        "from disk/s": 392.24
+      }
+    },
+    {
+      "t": 1785053340000,
+      "v": {
+        "from cache/s": 2688.99,
+        "from disk/s": 381.66
+      }
+    },
+    {
+      "t": 1785053343000,
+      "v": {
+        "from cache/s": 2904.32,
+        "from disk/s": 389.33
+      }
+    },
+    {
+      "t": 1785053346000,
+      "v": {
+        "from cache/s": 2514.67,
+        "from disk/s": 273.33
+      }
+    },
+    {
+      "t": 1785053349000,
+      "v": {
+        "from cache/s": 2627.9,
+        "from disk/s": 377.01
+      }
+    },
+    {
+      "t": 1785053352000,
+      "v": {
+        "from cache/s": 2916.99,
+        "from disk/s": 411.32
+      }
+    },
+    {
+      "t": 1785053355000,
+      "v": {
+        "from cache/s": 2766.34,
+        "from disk/s": 364.67
+      }
+    },
+    {
+      "t": 1785053358000,
+      "v": {
+        "from cache/s": 2587.68,
+        "from disk/s": 386.67
+      }
+    },
+    {
+      "t": 1785053361000,
+      "v": {
+        "from cache/s": 2474.68,
+        "from disk/s": 329
+      }
+    },
+    {
+      "t": 1785053364000,
+      "v": {
+        "from cache/s": 2181,
+        "from disk/s": 263.67
+      }
+    },
+    {
+      "t": 1785053367000,
+      "v": {
+        "from cache/s": 2930.32,
+        "from disk/s": 374.33
+      }
+    },
+    {
+      "t": 1785053370000,
+      "v": {
+        "from cache/s": 2327.9,
+        "from disk/s": 342.66
+      }
+    },
+    {
+      "t": 1785053373000,
+      "v": {
+        "from cache/s": 2642.54,
+        "from disk/s": 385.08
+      }
+    },
+    {
+      "t": 1785053376000,
+      "v": {
+        "from cache/s": 1926.42,
+        "from disk/s": 255.86
+      }
+    },
+    {
+      "t": 1785053379000,
+      "v": {
+        "from cache/s": 2609.66,
+        "from disk/s": 372
+      }
+    },
+    {
+      "t": 1785053382000,
+      "v": {
+        "from cache/s": 2831.89,
+        "from disk/s": 311.02
+      }
+    },
+    {
+      "t": 1785053385000,
+      "v": {
+        "from cache/s": 2266.75,
+        "from disk/s": 305.76
+      }
+    },
+    {
+      "t": 1785053388000,
+      "v": {
+        "from cache/s": 2846.93,
+        "from disk/s": 399.61
+      }
+    },
+    {
+      "t": 1785053391000,
+      "v": {
+        "from cache/s": 2738.64,
+        "from disk/s": 377.33
+      }
+    },
+    {
+      "t": 1785053394000,
+      "v": {
+        "from cache/s": 2525.03,
+        "from disk/s": 363.34
+      }
+    },
+    {
+      "t": 1785053397000,
+      "v": {
+        "from cache/s": 2757.98,
+        "from disk/s": 387.66
+      }
+    },
+    {
+      "t": 1785053400000,
+      "v": {
+        "from cache/s": 2457.01,
+        "from disk/s": 268
+      }
+    },
+    {
+      "t": 1785053403000,
+      "v": {
+        "from cache/s": 2926.66,
+        "from disk/s": 408.71
+      }
+    },
+    {
+      "t": 1785053406000,
+      "v": {
+        "from cache/s": 2659.38,
+        "from disk/s": 372.96
+      }
+    },
+    {
+      "t": 1785053409000,
+      "v": {
+        "from cache/s": 2776,
+        "from disk/s": 370
+      }
+    },
+    {
+      "t": 1785053412000,
+      "v": {
+        "from cache/s": 2838,
+        "from disk/s": 391
+      }
+    },
+    {
+      "t": 1785053415000,
+      "v": {
+        "from cache/s": 2584.68,
+        "from disk/s": 350.67
+      }
+    },
+    {
+      "t": 1785053418000,
+      "v": {
+        "from cache/s": 2757.97,
+        "from disk/s": 394
+      }
+    },
+    {
+      "t": 1785053421000,
+      "v": {
+        "from cache/s": 2277.36,
+        "from disk/s": 262.34
+      }
+    },
+    {
+      "t": 1785053424000,
+      "v": {
+        "from cache/s": 2756.32,
+        "from disk/s": 353.66
+      }
+    },
+    {
+      "t": 1785053427000,
+      "v": {
+        "from cache/s": 2632.34,
+        "from disk/s": 357
+      }
+    },
+    {
+      "t": 1785053430000,
+      "v": {
+        "from cache/s": 2403.65,
+        "from disk/s": 352.33
+      }
+    },
+    {
+      "t": 1785053433000,
+      "v": {
+        "from cache/s": 2939.02,
+        "from disk/s": 395
+      }
+    },
+    {
+      "t": 1785053436000,
+      "v": {
+        "from cache/s": 2794.31,
+        "from disk/s": 367.09
+      }
+    },
+    {
+      "t": 1785053439000,
+      "v": {
+        "from cache/s": 2804.67,
+        "from disk/s": 362.25
+      }
+    },
+    {
+      "t": 1785053442000,
+      "v": {
+        "from cache/s": 3174.7,
+        "from disk/s": 425
+      }
+    },
+    {
+      "t": 1785053445000,
+      "v": {
+        "from cache/s": 1940.33,
+        "from disk/s": 233.33
+      }
+    },
+    {
+      "t": 1785053448000,
+      "v": {
+        "from cache/s": 2882.59,
+        "from disk/s": 380.45
+      }
+    },
+    {
+      "t": 1785053451000,
+      "v": {
+        "from cache/s": 2770.52,
+        "from disk/s": 383.94
+      }
+    },
+    {
+      "t": 1785053454000,
+      "v": {
+        "from cache/s": 2901.94,
+        "from disk/s": 397.95
+      }
+    },
+    {
+      "t": 1785053457000,
+      "v": {
+        "from cache/s": 2791.34,
+        "from disk/s": 394
+      }
+    },
+    {
+      "t": 1785053460000,
+      "v": {
+        "from cache/s": 2218.67,
+        "from disk/s": 339.67
+      }
+    },
+    {
+      "t": 1785053463000,
+      "v": {
+        "from cache/s": 2906.98,
+        "from disk/s": 399.66
+      }
+    },
+    {
+      "t": 1785053466000,
+      "v": {
+        "from cache/s": 2488,
+        "from disk/s": 279.67
+      }
+    },
+    {
+      "t": 1785053469000,
+      "v": {
+        "from cache/s": 2862.55,
+        "from disk/s": 373.36
+      }
+    },
+    {
+      "t": 1785053472000,
+      "v": {
+        "from cache/s": 2754.39,
+        "from disk/s": 390.29
+      }
+    },
+    {
+      "t": 1785053475000,
+      "v": {
+        "from cache/s": 2356.35,
+        "from disk/s": 337.34
+      }
+    },
+    {
+      "t": 1785053478000,
+      "v": {
+        "from cache/s": 2798,
+        "from disk/s": 390
+      }
+    },
+    {
+      "t": 1785053481000,
+      "v": {
+        "from cache/s": 2562.14,
+        "from disk/s": 346.35
+      }
+    },
+    {
+      "t": 1785053484000,
+      "v": {
+        "from cache/s": 2828.52,
+        "from disk/s": 376.98
+      }
+    },
+    {
+      "t": 1785053487000,
+      "v": {
+        "from cache/s": 2507,
+        "from disk/s": 284.33
+      }
+    },
+    {
+      "t": 1785053490000,
+      "v": {
+        "from cache/s": 2654.84,
+        "from disk/s": 376
+      }
+    },
+    {
+      "t": 1785053493000,
+      "v": {
+        "from cache/s": 2802.34,
+        "from disk/s": 383
+      }
+    },
+    {
+      "t": 1785053496000,
+      "v": {
+        "from cache/s": 2684.65,
+        "from disk/s": 372.33
+      }
+    },
+    {
+      "t": 1785053499000,
+      "v": {
+        "from cache/s": 2605.98,
+        "from disk/s": 362.69
+      }
+    },
+    {
+      "t": 1785053502000,
+      "v": {
+        "from cache/s": 3010.71,
+        "from disk/s": 422.44
+      }
+    },
+    {
+      "t": 1785053505000,
+      "v": {
+        "from cache/s": 2761.99,
+        "from disk/s": 364.25
+      }
+    },
+    {
+      "t": 1785053508000,
+      "v": {
+        "from cache/s": 2510.09,
+        "from disk/s": 289.71
+      }
+    },
+    {
+      "t": 1785053511000,
+      "v": {
+        "from cache/s": 2510.34,
+        "from disk/s": 349
+      }
+    },
+    {
+      "t": 1785053514000,
+      "v": {
+        "from cache/s": 2557.53,
+        "from disk/s": 363.22
+      }
+    },
+    {
+      "t": 1785053517000,
+      "v": {
+        "from cache/s": 2747.31,
+        "from disk/s": 386
+      }
+    },
+    {
+      "t": 1785053520000,
+      "v": {
+        "from cache/s": 2814.66,
+        "from disk/s": 388
+      }
+    }
+  ],
+  "blocking": []
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -794,6 +795,9 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topB
 	topCount := map[string]int{}
 	topByWait := map[string]map[string]int{}
 	queryIDOf := map[string]int64{}
+	// topDisplay maps a grouping key to the text shown for it, for the keys
+	// that are not the text itself (a query id).
+	topDisplay := map[string]string{}
 	totalSamples := 0
 	totalRows := 0
 
@@ -831,16 +835,24 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topB
 			totalRows++
 
 			topKey := sliceKey(row, topBy)
+			// Ranking SQL, the query id is the better identity: the same
+			// statement with different literals is one query, and
+			// pg_stat_activity hands out the raw text, so grouping by text
+			// would list it once per set of values. The text of the first
+			// sample seen is what gets displayed.
+			if topBy == "sql" && row.queryID != 0 {
+				id := row.queryID
+				topKey = "id:" + strconv.FormatInt(id, 10)
+				if _, seen := topDisplay[topKey]; !seen {
+					topDisplay[topKey] = row.query
+				}
+				queryIDOf[topKey] = id
+			}
 			topCount[topKey]++
 			if topByWait[topKey] == nil {
 				topByWait[topKey] = map[string]int{}
 			}
 			topByWait[topKey][row.class]++
-			// The query id only identifies a query, so pg_stat_statements
-			// enrichment applies to the SQL dimension alone.
-			if topBy == "sql" && row.queryID != 0 {
-				queryIDOf[topKey] = row.queryID
-			}
 		}
 	}
 
@@ -909,7 +921,11 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topB
 
 	var top []topSQLOut
 	for q, n := range topCount {
-		entry := topSQLOut{Query: q, ByClass: map[string]float64{}, queryID: queryIDOf[q]}
+		label := q
+		if text, ok := topDisplay[q]; ok {
+			label = text
+		}
+		entry := topSQLOut{Query: label, ByClass: map[string]float64{}, queryID: queryIDOf[q]}
 		if totalSamples > 0 {
 			entry.AAS = round2(float64(n) / float64(totalSamples))
 			merged := map[string]int{}

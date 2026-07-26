@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Draw the GitHub social preview card (1280x640).
 
-    python3 tools/make_social.py
+    python3 tools/make_social.py [--force]
 
 GitHub scales the card down hard in timelines, so this stays deliberately
 plain: icon, name, one line of what it is. Nothing that needs to be read at
 thumbnail size beyond the name.
+
+The committed card was refined by hand after this script drew the first
+version, so the script refuses to overwrite it without --force.
 """
 
 import os
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -45,6 +49,10 @@ def lerp(a, b, t):
 
 
 def main():
+    if os.path.exists(OUT) and "--force" not in sys.argv:
+        print(os.path.normpath(OUT), "exists; pass --force to redraw it")
+        return
+
     img = Image.new("RGB", (W, H))
     d = ImageDraw.Draw(img)
     for y in range(H):

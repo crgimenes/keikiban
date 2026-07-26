@@ -1,0 +1,50 @@
+{
+  "databaseAge": 76691,
+  "freezeMaxAge": 200000000,
+  "wraparoundPct": 0.04,
+  "oldestTables": [
+    {
+      "schema": "public",
+      "table": "pgbench_accounts",
+      "age": 75181,
+      "pct": 0.04,
+      "size": "541 MB"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_history",
+      "age": 23474,
+      "pct": 0.01,
+      "size": "2064 kB"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_tellers",
+      "age": 4382,
+      "pct": 0,
+      "size": "160 kB"
+    },
+    {
+      "schema": "public",
+      "table": "pgbench_branches",
+      "age": 1592,
+      "pct": 0,
+      "size": "72 kB"
+    }
+  ],
+  "needVacuum": [
+    {
+      "schema": "public",
+      "table": "pgbench_accounts",
+      "liveRows": 2999974,
+      "deadRows": 46597,
+      "deadPct": 1.5,
+      "size": "541 MB",
+      "vacuumAgo": 656.27,
+      "analyzeAgo": 656.03,
+      "vacuumSQL": "VACUUM (ANALYZE) \"public\".\"pgbench_accounts\";"
+    }
+  ],
+  "longTx": [],
+  "sequences": []
+}

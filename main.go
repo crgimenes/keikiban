@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -109,6 +110,39 @@ func runJSON(cfg Config, configErr string, args []string) {
 			os.Exit(1)
 		}
 		_ = enc.Encode(map[string]any{"blocking": tree})
+	case "dashboard":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		// The load chart is built from samples over time, so this command
+		// samples for a while before answering. Default 30s; the caller can
+		// ask for another duration.
+		seconds := 30
+		if len(args) > 1 {
+			n, err := strconv.Atoi(args[1])
+			if err != nil || n < 1 {
+				_ = enc.Encode(map[string]string{
+					"error": "usage: keikiban -json dashboard [seconds]",
+				})
+				os.Exit(1)
+			}
+			seconds = n
+		}
+		sampler := newSampler(cfg.Connections[0].URL)
+		time.Sleep(time.Duration(seconds) * time.Second)
+		out := sampler.Snapshot(time.Now(), seconds, "waits", "sql")
+		sampler.Stop()
+		out.Title = cfg.Connections[0].Title
+		out.URL = cfg.Connections[0].MaskedURL
+		_ = enc.Encode(out)
+		if !out.Connected {
+			os.Exit(1)
+		}
 	case "sessions":
 		if configErr != "" {
 			_ = enc.Encode(map[string]string{"error": configErr})
@@ -140,7 +174,7 @@ func runJSON(cfg Config, configErr string, args []string) {
 	default:
 		_ = enc.Encode(map[string]any{
 			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections", "indexes", "locks", "maintenance", "sessions"},
+			"commands": []string{"connections", "dashboard", "indexes", "locks", "maintenance", "sessions"},
 		})
 		os.Exit(1)
 	}
