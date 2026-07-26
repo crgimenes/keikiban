@@ -28,7 +28,7 @@ func TestAggregate(t *testing.T) {
 		}},
 	}
 
-	out := aggregate(samples, now, window)
+	out := aggregate(samples, now, window, "waits")
 
 	if out.BucketSeconds != 3 {
 		t.Errorf("bucketSeconds = %d, want 3", out.BucketSeconds)
@@ -114,7 +114,7 @@ func TestAggregateFoldsTailIntoOther(t *testing.T) {
 	}
 	samples := []sample{{at: now.Add(-5 * time.Second), rows: rows}}
 
-	out := aggregate(samples, now, 300)
+	out := aggregate(samples, now, 300, "waits")
 
 	if len(out.Classes) != chartClassLimit+1 {
 		t.Fatalf("classes = %d (%v), want %d + Other",
@@ -144,8 +144,8 @@ func TestAggregateStableBuckets(t *testing.T) {
 		{class: "CPU", query: "SELECT 1"},
 	}}}
 
-	a := aggregate(samples, base, 300)
-	b := aggregate(samples, base.Add(2*time.Second), 300)
+	a := aggregate(samples, base, 300, "waits")
+	b := aggregate(samples, base.Add(2*time.Second), 300, "waits")
 
 	find := func(out dashOut) *bucketOut {
 		for i := range out.Buckets {
@@ -204,8 +204,46 @@ func TestEnrichTopSQL(t *testing.T) {
 	}
 }
 
+// TestAggregateSliceBy checks the chart regroups by the chosen dimension
+// while the Top SQL breakdown stays in wait classes.
+func TestAggregateSliceBy(t *testing.T) {
+	now := time.Date(2026, 7, 25, 12, 0, 2, 0, time.UTC)
+	samples := []sample{{at: now.Add(-5 * time.Second), rows: []activeRow{
+		{class: "CPU", query: "SELECT 1", user: "alice", db: "app", host: "10.0.0.1"},
+		{class: "Lock", query: "UPDATE t", user: "bob", db: "app", host: "10.0.0.2"},
+		{class: "CPU", query: "SELECT 2", user: "alice", db: "other", host: ""},
+	}}}
+
+	byUser := aggregate(samples, now, 300, "users")
+	if len(byUser.Classes) != 2 || byUser.Classes[0] != "alice" {
+		t.Errorf("classes by user = %v, want alice first", byUser.Classes)
+	}
+	last := byUser.Buckets[chartBuckets-1]
+	if last.V["alice"] != 2 || last.V["bob"] != 1 {
+		t.Errorf("by user = %v, want alice 2 bob 1", last.V)
+	}
+	// The per-query bars keep speaking in wait classes.
+	if len(byUser.WaitClasses) != 2 {
+		t.Errorf("waitClasses = %v, want CPU and Lock", byUser.WaitClasses)
+	}
+	if byUser.TopSQL[0].ByClass["CPU"] == 0 {
+		t.Errorf("top SQL lost its wait breakdown: %+v", byUser.TopSQL[0])
+	}
+
+	byDB := aggregate(samples, now, 300, "databases")
+	if byDB.Buckets[chartBuckets-1].V["app"] != 2 {
+		t.Errorf("by database = %v, want app 2", byDB.Buckets[chartBuckets-1].V)
+	}
+
+	// An empty dimension value is labelled, never dropped or blank.
+	byHost := aggregate(samples, now, 300, "hosts")
+	if byHost.Buckets[chartBuckets-1].V["(unset)"] != 1 {
+		t.Errorf("by host = %v, want one (unset)", byHost.Buckets[chartBuckets-1].V)
+	}
+}
+
 func TestAggregateEmpty(t *testing.T) {
-	out := aggregate(nil, time.Now(), 300)
+	out := aggregate(nil, time.Now(), 300, "waits")
 	if len(out.Buckets) != chartBuckets {
 		t.Errorf("buckets = %d, want %d", len(out.Buckets), chartBuckets)
 	}

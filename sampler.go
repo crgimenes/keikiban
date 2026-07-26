@@ -28,11 +28,40 @@ const (
 // UI shows the yellow badge with install hints instead of failing.
 var requiredExtensions = []string{"pg_stat_statements"}
 
-// activeRow is one active session captured in a sample.
+// activeRow is one active session captured in a sample. Besides the wait
+// class, it carries the dimensions the chart can be sliced by.
 type activeRow struct {
 	class   string // wait event key (waitKey), or CPU when not waiting
 	query   string
 	queryID int64 // pg_stat_activity.query_id (PG14+), 0 when unavailable
+	user    string
+	app     string
+	host    string
+	db      string
+}
+
+// sliceKey returns the grouping key of a row for the chosen dimension. The
+// menu of dimensions lives in the page; anything unknown falls back to waits.
+func sliceKey(r activeRow, sliceBy string) string {
+	value := ""
+	switch sliceBy {
+	case "sql":
+		value = r.query
+	case "users":
+		value = r.user
+	case "hosts":
+		value = r.host
+	case "applications":
+		value = r.app
+	case "databases":
+		value = r.db
+	default:
+		value = r.class
+	}
+	if value == "" {
+		return "(unset)"
+	}
+	return value
 }
 
 // sample is one capture of pg_stat_activity plus the cluster counters taken
@@ -378,24 +407,32 @@ func maxConnections(ctx context.Context, conn *pgx.Conn) (int, error) {
 }
 
 const sqlActivity = `SELECT
-		COALESCE(state, ''),           -- 1
-		COALESCE(wait_event_type, ''), -- 2
-		COALESCE(wait_event, ''),      -- 3
-		COALESCE(query, ''),           -- 4
-		backend_type,                  -- 5
-		COALESCE(query_id, 0)          -- 6
+		COALESCE(state, ''),                    -- 1
+		COALESCE(wait_event_type, ''),          -- 2
+		COALESCE(wait_event, ''),               -- 3
+		COALESCE(query, ''),                    -- 4
+		backend_type,                           -- 5
+		COALESCE(query_id, 0),                  -- 6
+		COALESCE(usename, ''),                  -- 7
+		COALESCE(application_name, ''),         -- 8
+		COALESCE(host(client_addr), 'local'),   -- 9
+		COALESCE(datname, '')                   -- 10
 	FROM pg_stat_activity
 	WHERE pid <> pg_backend_pid()
 	AND backend_type IN ('client backend', 'parallel worker');`
 
 // sqlActivityNoQueryID is the PG13-and-older variant: no query_id column.
 const sqlActivityNoQueryID = `SELECT
-		COALESCE(state, ''),           -- 1
-		COALESCE(wait_event_type, ''), -- 2
-		COALESCE(wait_event, ''),      -- 3
-		COALESCE(query, ''),           -- 4
-		backend_type,                  -- 5
-		0::bigint                      -- 6 (query_id placeholder)
+		COALESCE(state, ''),                    -- 1
+		COALESCE(wait_event_type, ''),          -- 2
+		COALESCE(wait_event, ''),               -- 3
+		COALESCE(query, ''),                    -- 4
+		backend_type,                           -- 5
+		0::bigint,                              -- 6 (query_id placeholder)
+		COALESCE(usename, ''),                  -- 7
+		COALESCE(application_name, ''),         -- 8
+		COALESCE(host(client_addr), 'local'),   -- 9
+		COALESCE(datname, '')                   -- 10
 	FROM pg_stat_activity
 	WHERE pid <> pg_backend_pid()
 	AND backend_type IN ('client backend', 'parallel worker');`
@@ -416,6 +453,7 @@ func sampleActivity(ctx context.Context, conn *pgx.Conn, query string) (sample, 
 
 	for rows.Next() {
 		var state, typ, event, queryText, backend string
+		var user, app, host, db string
 		var queryID int64
 		err = rows.Scan(
 			&state,     // 1
@@ -424,6 +462,10 @@ func sampleActivity(ctx context.Context, conn *pgx.Conn, query string) (sample, 
 			&queryText, // 4
 			&backend,   // 5
 			&queryID,   // 6
+			&user,      // 7
+			&app,       // 8
+			&host,      // 9
+			&db,        // 10
 		)
 		if err != nil {
 			return smp, err
@@ -434,6 +476,10 @@ func sampleActivity(ctx context.Context, conn *pgx.Conn, query string) (sample, 
 				class:   waitKey(typ, event),
 				query:   queryText,
 				queryID: queryID,
+				user:    user,
+				app:     app,
+				host:    host,
+				db:      db,
 			})
 		}
 		if backend != "client backend" {
@@ -564,11 +610,15 @@ type dashOut struct {
 	BucketSeconds int    `json:"bucketSeconds"`
 	// Samples is how many activity captures landed in the window; it lets the
 	// UI distinguish "sampling an idle database" from "not sampling at all".
-	Samples int         `json:"samples"`
-	Classes []string    `json:"classes"`
-	Buckets []bucketOut `json:"buckets"`
-	TopSQL  []topSQLOut `json:"topSQL"`
-	Missing []string    `json:"missingExtensions"`
+	Samples int    `json:"samples"`
+	SliceBy string `json:"sliceBy"`
+	// Classes are the chart series for the current slice dimension;
+	// WaitClasses are always wait events, for the Top SQL breakdown.
+	Classes     []string    `json:"classes"`
+	WaitClasses []string    `json:"waitClasses"`
+	Buckets     []bucketOut `json:"buckets"`
+	TopSQL      []topSQLOut `json:"topSQL"`
+	Missing     []string    `json:"missingExtensions"`
 	// MissingPreloaded lists the missing extensions whose library is already
 	// preloaded: installing them is one CREATE EXTENSION, no server restart.
 	MissingPreloaded []string `json:"missingPreloaded"`
@@ -597,7 +647,7 @@ var (
 
 // Snapshot aggregates the sliding window ending now into chart buckets and a
 // top-SQL ranking.
-func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
+func (s *Sampler) Snapshot(now time.Time, windowSeconds int, sliceBy string) dashOut {
 	s.mu.Lock()
 	samples := s.samples
 	status := s.status
@@ -607,7 +657,7 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 	blocking := s.blocking
 	s.mu.Unlock()
 
-	out := aggregate(samples, now, windowSeconds)
+	out := aggregate(samples, now, windowSeconds, sliceBy)
 	enrichTopSQL(out.TopSQL, pgss, now.Add(-time.Duration(out.WindowSeconds)*time.Second))
 	out.Connected = status == "sampling"
 	out.Status = status
@@ -629,6 +679,61 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 	return out
 }
 
+// rankAndFold orders series by load, keeps the heaviest chartClassLimit and
+// folds the tail into "Other". CPU, when present, is always kept and stacked
+// first, the way Performance Insights draws it. It returns the ordered series
+// and the mapping that sends a dropped series to "Other".
+func rankAndFold(seen map[string]bool, total map[string]int) ([]string, func(string) string) {
+	var ranked []string
+	for c := range seen {
+		ranked = append(ranked, c)
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if total[ranked[i]] != total[ranked[j]] {
+			return total[ranked[i]] > total[ranked[j]]
+		}
+		return ranked[i] < ranked[j]
+	})
+
+	kept := map[string]bool{}
+	if seen["CPU"] {
+		kept["CPU"] = true
+	}
+	for _, c := range ranked {
+		if len(kept) >= chartClassLimit {
+			break
+		}
+		kept[c] = true
+	}
+
+	var out []string
+	hasOther := false
+	if seen["CPU"] {
+		out = append(out, "CPU")
+	}
+	for _, c := range ranked {
+		if c == "CPU" {
+			continue
+		}
+		if kept[c] {
+			out = append(out, c)
+			continue
+		}
+		hasOther = true
+	}
+	if hasOther {
+		out = append(out, "Other")
+	}
+
+	mapTo := func(c string) string {
+		if kept[c] {
+			return c
+		}
+		return "Other"
+	}
+	return out, mapTo
+}
+
 // aggregate is the pure core of Snapshot, separated for testing.
 //
 // Buckets align to ABSOLUTE time boundaries (multiples of the bucket size),
@@ -636,7 +741,7 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int) dashOut {
 // past never redraws differently between refreshes. The in-progress bucket is
 // not charted at all — its average wobbles as samples arrive, which reads as
 // the chart rewriting itself; it appears once its period closes.
-func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
+func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy string) dashOut {
 	if windowSeconds < chartBuckets {
 		windowSeconds = chartBuckets
 	}
@@ -660,6 +765,10 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 	}
 
 	classSeen := map[string]bool{}
+	// waitSeen tracks wait classes regardless of the chart's dimension: the
+	// Top SQL bars always break a query down by what it waited on.
+	waitSeen := map[string]bool{}
+	waitTotal := map[string]int{}
 	queryCount := map[string]int{}
 	queryByClass := map[string]map[string]int{}
 	queryIDOf := map[string]int64{}
@@ -691,78 +800,39 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 			buckets[idx].ioN++
 		}
 		for _, row := range smp.rows {
-			buckets[idx].count[row.class]++
-			classSeen[row.class] = true
+			row.query = normalizeQuery(row.query)
+			key := sliceKey(row, sliceBy)
+			buckets[idx].count[key]++
+			classSeen[key] = true
+			waitSeen[row.class] = true
+			waitTotal[row.class]++
 			totalRows++
-			q := normalizeQuery(row.query)
-			if q == "" {
+			if row.query == "" {
 				continue
 			}
-			queryCount[q]++
-			if queryByClass[q] == nil {
-				queryByClass[q] = map[string]int{}
+			queryCount[row.query]++
+			if queryByClass[row.query] == nil {
+				queryByClass[row.query] = map[string]int{}
 			}
-			queryByClass[q][row.class]++
+			queryByClass[row.query][row.class]++
 			if row.queryID != 0 {
-				queryIDOf[q] = row.queryID
+				queryIDOf[row.query] = row.queryID
 			}
 		}
 	}
 
-	// Performance Insights keeps the chart legible by showing the top wait
-	// events and folding the tail into a gray "Other".
+	// Performance Insights keeps the chart legible by showing the top series
+	// and folding the tail into a gray "Other".
 	classTotal := map[string]int{}
 	for _, b := range buckets {
 		for class, n := range b.count {
 			classTotal[class] += n
 		}
 	}
-	var ranked []string
-	for c := range classSeen {
-		ranked = append(ranked, c)
-	}
-	sort.Slice(ranked, func(i, j int) bool {
-		if classTotal[ranked[i]] != classTotal[ranked[j]] {
-			return classTotal[ranked[i]] > classTotal[ranked[j]]
-		}
-		return ranked[i] < ranked[j]
-	})
-	kept := map[string]bool{}
-	if classSeen["CPU"] {
-		kept["CPU"] = true
-	}
-	for _, c := range ranked {
-		if len(kept) >= chartClassLimit {
-			break
-		}
-		kept[c] = true
-	}
-	mapClass := func(c string) string {
-		if kept[c] {
-			return c
-		}
-		return "Other"
-	}
-
-	// Stacking order: CPU at the bottom (like PI), then by load, Other last.
-	var classes []string
-	hasOther := false
-	if classSeen["CPU"] {
-		classes = append(classes, "CPU")
-	}
-	for _, c := range ranked {
-		if c == "CPU" {
-			continue
-		}
-		if kept[c] {
-			classes = append(classes, c)
-			continue
-		}
-		hasOther = true
-	}
-	if hasOther {
-		classes = append(classes, "Other")
-	}
+	classes, mapClass := rankAndFold(classSeen, classTotal)
+	// The Top SQL breakdown always speaks in wait classes, whatever the chart
+	// is sliced by.
+	waitClasses, mapWait := rankAndFold(waitSeen, waitTotal)
 	if classes == nil {
 		// nil marshals to JSON null and a null breaks the UI's iteration; an
 		// idle window is an empty list, not an absence.
@@ -821,7 +891,7 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 			entry.AAS = round2(float64(n) / float64(totalSamples))
 			merged := map[string]int{}
 			for class, cn := range queryByClass[q] {
-				merged[mapClass(class)] += cn
+				merged[mapWait(class)] += cn
 			}
 			for class, cn := range merged {
 				entry.ByClass[class] = round2(float64(cn) / float64(totalSamples))
@@ -845,11 +915,16 @@ func aggregate(samples []sample, now time.Time, windowSeconds int) dashOut {
 		top = []topSQLOut{}
 	}
 
+	if waitClasses == nil {
+		waitClasses = []string{}
+	}
 	return dashOut{
 		WindowSeconds: windowSeconds,
 		BucketSeconds: bucketSeconds,
+		SliceBy:       sliceBy,
 		Samples:       totalSamples,
 		Classes:       classes,
+		WaitClasses:   waitClasses,
 		Buckets:       outBuckets,
 		TopSQL:        top,
 		ConnClasses:   connClasses,

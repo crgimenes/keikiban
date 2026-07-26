@@ -219,13 +219,14 @@ func runGUI(cfg Config, configErr string) {
 		log.Fatal(err)
 	}
 
-	err = w.Bind("dashboardState", func(windowSeconds int) (dashOut, error) {
+	err = w.Bind("dashboardState", func(windowSeconds int, sliceBy string) (dashOut, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if sampler == nil {
 			return dashOut{
 				Status:           "no connection configured",
 				Classes:          []string{},
+				WaitClasses:      []string{},
 				Buckets:          []bucketOut{},
 				TopSQL:           []topSQLOut{},
 				Missing:          []string{},
@@ -239,7 +240,7 @@ func runGUI(cfg Config, configErr string) {
 				Blocking:         []blockerOut{},
 			}, nil
 		}
-		out := sampler.Snapshot(time.Now(), windowSeconds)
+		out := sampler.Snapshot(time.Now(), windowSeconds, sliceBy)
 		out.Title = cfg.Connections[0].Title
 		out.URL = cfg.Connections[0].MaskedURL
 		return out, nil

@@ -74,6 +74,8 @@ let maintOpen = false;
 
 const WINDOW_KEY = "keikiban.window";
 let windowSeconds = Number(localStorage.getItem(WINDOW_KEY)) || 300;
+const SLICE_KEY = "keikiban.sliceBy";
+let sliceBy = localStorage.getItem(SLICE_KEY) || "waits";
 
 // Wait events are open-ended ("IO:WALSync", "LWLock:WALWrite", ...), so
 // colors are assigned by name hash from a fixed palette; only the two anchors
@@ -257,7 +259,7 @@ let dash = null;
 async function refreshDashboard() {
   if (el("dashboard").hidden || paused) return;
   try {
-    dash = await window.dashboardState(windowSeconds);
+    dash = await window.dashboardState(windowSeconds, sliceBy);
   } catch (err) {
     el("dash-status").textContent = String(err);
     return;
@@ -597,6 +599,9 @@ function renderLegend() {
   for (const cls of dash.classes) {
     const item = document.createElement("span");
     item.className = "legend-item";
+    // A SQL slice key is a whole statement: the row is clipped, the full
+    // text stays reachable on hover.
+    item.title = cls;
     const swatch = document.createElement("span");
     swatch.className = "legend-swatch";
     swatch.style.background = classColor(cls);
@@ -626,7 +631,9 @@ function renderTopSQL() {
     const bar = document.createElement("div");
     bar.className = "sql-bar";
     bar.style.width = Math.max(1, q.pct) + "%";
-    for (const cls of dash.classes) {
+    // Always wait classes here, whatever the chart is sliced by: the bar
+    // answers "where does this query spend its time".
+    for (const cls of dash.waitClasses) {
       const v = q.byClass[cls];
       if (!v) continue;
       const seg = document.createElement("span");
@@ -729,6 +736,15 @@ for (const b of document.querySelectorAll(".win")) {
     refreshDashboard();
   });
 }
+
+el("slice-by").value = sliceBy;
+el("slice-by").addEventListener("change", () => {
+  sliceBy = el("slice-by").value;
+  localStorage.setItem(SLICE_KEY, sliceBy);
+  paused = false;
+  renderPause();
+  refreshDashboard();
+});
 
 el("connections-btn").addEventListener("click", () => {
   listOpen = true;

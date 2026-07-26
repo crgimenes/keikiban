@@ -49,6 +49,21 @@
     .dash-header h2 { margin: 0; }
     .dash-actions { margin-top: 0; margin-left: auto; }
     .windows { display: inline-flex; gap: 0.2rem; }
+    .slice-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0;
+      font-size: 0.9rem;
+    }
+    .slice-label select { font: inherit; }
+    /* A slice key can be a whole SQL statement; keep the legend a column. */
+    .legend-item {
+      max-width: 16rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .win[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
     /* Chart with the legend to its right, Performance Insights style; on a
        narrow window the legend wraps below. */
@@ -287,6 +302,16 @@
     <div class="dash-header">
       <h2 id="dash-title"></h2>
       <div class="buttons dash-actions">
+        <label class="slice-label">Sliced by
+          <select id="slice-by">
+            <option value="waits">Waits</option>
+            <option value="sql">SQL</option>
+            <option value="users">Users</option>
+            <option value="hosts">Hosts</option>
+            <option value="applications">Applications</option>
+            <option value="databases">Databases</option>
+          </select>
+        </label>
         <span class="windows" role="group" aria-label="Time window">
           <button type="button" class="win" data-window="300">5m</button>
           <button type="button" class="win" data-window="900">15m</button>
