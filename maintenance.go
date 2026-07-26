@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -317,6 +318,32 @@ func collectSequences(ctx context.Context, conn *pgx.Conn, report *maintenanceRe
 	return rows.Err()
 }
 
+// vacuumTracker remembers the backend PID of the vacuum this app started, so
+// progress is attributed to it and never to an autovacuum of the same table.
+var vacuumTracker struct {
+	mu      sync.Mutex
+	running bool
+	pid     uint32
+	schema  string
+	table   string
+	started time.Time
+}
+
+// vacuumProgressOut reports what the server says about the running vacuum.
+// Phase names come straight from PostgreSQL ("scanning heap", "vacuuming
+// indexes", ...), so the screen never invents progress it cannot see.
+type vacuumProgressOut struct {
+	Running        bool    `json:"running"`
+	Schema         string  `json:"schema"`
+	Table          string  `json:"table"`
+	Phase          string  `json:"phase"`
+	Pct            float64 `json:"pct"`
+	HeapBlksTotal  int64   `json:"heapBlksTotal"`
+	HeapBlksDone   int64   `json:"heapBlksDone"`
+	IndexPasses    int64   `json:"indexPasses"`
+	ElapsedSeconds float64 `json:"elapsedSeconds"`
+}
+
 // runVacuum executes the same VACUUM (ANALYZE) the UI displayed. It is not
 // destructive, but it can run for a long time on a big table, hence the wide
 // timeout; the server keeps working throughout.
@@ -333,6 +360,19 @@ func runVacuum(ctx context.Context, dbURL, schema, table string) error {
 		cancel()
 	}()
 
+	vacuumTracker.mu.Lock()
+	vacuumTracker.running = true
+	vacuumTracker.pid = conn.PgConn().PID()
+	vacuumTracker.schema = schema
+	vacuumTracker.table = table
+	vacuumTracker.started = time.Now()
+	vacuumTracker.mu.Unlock()
+	defer func() {
+		vacuumTracker.mu.Lock()
+		vacuumTracker.running = false
+		vacuumTracker.mu.Unlock()
+	}()
+
 	qctx, cancel := context.WithTimeout(ctx, vacuumTimeout)
 	defer cancel()
 	start := time.Now()
@@ -343,4 +383,63 @@ func runVacuum(ctx context.Context, dbURL, schema, table string) error {
 	debugf("event=vacuum_done schema=%s table=%s seconds=%.1f",
 		schema, table, time.Since(start).Seconds())
 	return nil
+}
+
+const sqlVacuumProgress = `SELECT
+		phase,             -- 1
+		heap_blks_total,   -- 2
+		heap_blks_scanned, -- 3
+		index_vacuum_count -- 4
+	FROM pg_stat_progress_vacuum
+	WHERE pid = $1;` // 1
+
+// collectVacuumProgress asks the server how far the vacuum this app started
+// has got. A vacuum that is running but not yet visible in the progress view
+// still reports Running with the elapsed time, so the screen always shows the
+// action is alive.
+func collectVacuumProgress(ctx context.Context, dbURL string) vacuumProgressOut {
+	vacuumTracker.mu.Lock()
+	out := vacuumProgressOut{
+		Running: vacuumTracker.running,
+		Schema:  vacuumTracker.schema,
+		Table:   vacuumTracker.table,
+	}
+	pid := vacuumTracker.pid
+	started := vacuumTracker.started
+	vacuumTracker.mu.Unlock()
+
+	if !out.Running {
+		return out
+	}
+	out.ElapsedSeconds = round2(time.Since(started).Seconds())
+
+	connCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+	conn, err := pgx.Connect(connCtx, dbURL)
+	cancel()
+	if err != nil {
+		return out
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), sampleTimeout)
+		_ = conn.Close(closeCtx)
+		cancel()
+	}()
+
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	err = conn.QueryRow(qctx, sqlVacuumProgress, pid).Scan(
+		&out.Phase,         // 1
+		&out.HeapBlksTotal, // 2
+		&out.HeapBlksDone,  // 3
+		&out.IndexPasses,   // 4
+	)
+	if err != nil {
+		// No row yet (or already gone): the elapsed time still tells the user
+		// the vacuum is alive.
+		return out
+	}
+	if out.HeapBlksTotal > 0 {
+		out.Pct = round2(100 * float64(out.HeapBlksDone) / float64(out.HeapBlksTotal))
+	}
+	return out
 }

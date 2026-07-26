@@ -313,6 +313,20 @@ func runGUI(cfg Config, configErr string) {
 		log.Fatal(err)
 	}
 
+	err = w.Bind("vacuumProgress", func() (vacuumProgressOut, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			return vacuumProgressOut{}, nil
+		}
+		dbURL := cfg.Connections[0].URL
+		mu.Unlock()
+		return collectVacuumProgress(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = w.Bind("vacuumTable", func(schema, table string) (maintenanceReport, error) {
 		mu.Lock()
 		if len(cfg.Connections) == 0 {

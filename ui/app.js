@@ -385,12 +385,19 @@ function blockerActions(b) {
         "open, so its locks are only released on COMMIT or ROLLBACK.";
     const stmt = document.createElement("div");
     stmt.className = "sql-text";
-    stmt.textContent = terminate ? b.terminateSQL : b.cancelSQL;
-    const act = button(terminate ? "Terminate connection" : "Cancel query",
+    const sql = terminate ? b.terminateSQL : b.cancelSQL;
+    stmt.textContent = sql;
+    const copy = button("Copy SQL", async () => {
+      await navigator.clipboard.writeText(sql);
+    });
+    const act = button(terminate ? "Confirm termination" : "Confirm cancellation",
       () => runSignal(b, terminate));
     act.classList.add("destructive");
+    // "Back" rather than "Cancel": in this dialog cancelling IS the action,
+    // so a Cancel button would mean two opposite things at once.
     wrap.append(q, stmt, buttonRow(
-      button("Cancel", () => {
+      copy,
+      button("Back", () => {
         signalling = null;
         renderBlocking();
       }),
@@ -399,9 +406,6 @@ function blockerActions(b) {
     return wrap;
   }
 
-  const copy = button("Copy SQL", async () => {
-    await navigator.clipboard.writeText(b.cancelSQL + "\n" + b.terminateSQL);
-  });
   const cancelBtn = button("Cancel query...", () => {
     signalling = "cancel:" + b.pid;
     renderBlocking();
@@ -412,7 +416,7 @@ function blockerActions(b) {
     renderBlocking();
   });
   termBtn.classList.add("destructive");
-  return buttonRow(copy, cancelBtn, termBtn);
+  return buttonRow(cancelBtn, termBtn);
 }
 
 async function runSignal(b, terminate) {
@@ -804,9 +808,15 @@ function indexCell(e) {
     hint.className = "hint";
     hint.textContent = "Runs exactly the statement above. CONCURRENTLY does " +
       "not block writes, but can take a while on a big index.";
-    const drop = button("Drop index", () => runDropIndex(e));
+    // Copy lives here, next to the DROP statement it copies: in the list it
+    // sat beside the CREATE INDEX definition and read as copying that one.
+    const copy = button("Copy DDL", async () => {
+      await navigator.clipboard.writeText(e.dropDDL);
+    });
+    const drop = button("Confirm deletion", () => runDropIndex(e), "trash");
     drop.classList.add("destructive");
     cell.append(q, ddl, hint, buttonRow(
+      copy,
       button("Cancel", () => {
         idxConfirming = null;
         renderIndexes();
@@ -844,16 +854,14 @@ function indexCell(e) {
   def.className = "sql-text";
   def.textContent = e.definition;
 
-  const copy = button("Copy DDL", async () => {
-    await navigator.clipboard.writeText(e.dropDDL);
-  });
   const drop = button("Drop index...", () => {
     idxConfirming = key;
     renderIndexes();
   }, "trash");
   drop.classList.add("destructive");
+  drop.disabled = idxBusy;
 
-  cell.append(title, meta, def, buttonRow(copy, drop));
+  cell.append(title, meta, def, buttonRow(drop));
   return cell;
 }
 
@@ -907,14 +915,46 @@ function renderSeqScans(tables) {
   box.append(table);
 }
 
+// busyBar shows an indeterminate bar for an action whose duration the server
+// does not report. It has no percentage on purpose: an invented one lies.
+function busyBar(id, label) {
+  const box = el(id);
+  if (!label) {
+    box.hidden = true;
+    box.replaceChildren();
+    return;
+  }
+  box.hidden = false;
+  box.className = "cell";
+  box.replaceChildren();
+  const text = document.createElement("div");
+  text.textContent = label;
+  const track = document.createElement("div");
+  track.className = "progress-track";
+  const fill = document.createElement("div");
+  fill.className = "progress-fill indeterminate";
+  track.append(fill);
+  box.append(text, track);
+}
+
+let idxBusy = false;
+
 async function runDropIndex(e) {
-  el("idx-status").textContent = "Dropping " + e.name + "...";
   idxConfirming = null;
+  idxBusy = true;
+  el("idx-status").textContent = "";
+  renderIndexes();
+  // CONCURRENTLY waits for other transactions to finish, so this can take a
+  // while with no server-side progress to report.
+  busyBar("idx-progress", "Dropping " + e.name + " concurrently...");
   try {
     idxReport = await window.dropIndex(e.schema, e.name);
   } catch (err) {
     el("idx-status").textContent = "Could not drop: " + err;
     return;
+  } finally {
+    idxBusy = false;
+    busyBar("idx-progress", "");
   }
   renderIndexes();
 }
@@ -1073,12 +1113,17 @@ function txActions(t) {
         "open, so it keeps holding back vacuum until COMMIT or ROLLBACK.";
     const stmt = document.createElement("div");
     stmt.className = "sql-text";
-    stmt.textContent = terminate ? t.terminateSQL : t.cancelSQL;
-    const act = button(terminate ? "Terminate connection" : "Cancel query",
+    const sql = terminate ? t.terminateSQL : t.cancelSQL;
+    stmt.textContent = sql;
+    const copy = button("Copy SQL", async () => {
+      await navigator.clipboard.writeText(sql);
+    });
+    const act = button(terminate ? "Confirm termination" : "Confirm cancellation",
       () => runMaintSignal(t, terminate));
     act.classList.add("destructive");
     wrap.append(q, stmt, buttonRow(
-      button("Cancel", () => {
+      copy,
+      button("Back", () => {
         maintConfirming = null;
         renderMaintenance();
       }),
@@ -1087,9 +1132,6 @@ function txActions(t) {
     return wrap;
   }
 
-  const copy = button("Copy SQL", async () => {
-    await navigator.clipboard.writeText(t.cancelSQL + "\n" + t.terminateSQL);
-  });
   const cancelBtn = button("Cancel query...", () => {
     maintConfirming = "cancel:" + t.pid;
     renderMaintenance();
@@ -1100,7 +1142,7 @@ function txActions(t) {
     renderMaintenance();
   });
   termBtn.classList.add("destructive");
-  return buttonRow(copy, cancelBtn, termBtn);
+  return buttonRow(cancelBtn, termBtn);
 }
 
 async function runMaintSignal(t, terminate) {
@@ -1141,12 +1183,16 @@ function renderVacuum(list) {
       hint.textContent = "Reclaims dead rows and refreshes planner " +
         "statistics. Reads and writes keep working, but on a large table " +
         "this can run for a long time.";
+      const copy = button("Copy SQL", async () => {
+        await navigator.clipboard.writeText(t.vacuumSQL);
+      });
       cell.append(q, stmt, hint, buttonRow(
+        copy,
         button("Cancel", () => {
           maintConfirming = null;
           renderMaintenance();
         }),
-        button("Run vacuum", () => runVacuumTable(t)),
+        button("Confirm vacuum", () => runVacuumTable(t)),
       ));
       box.append(cell);
       continue;
@@ -1172,30 +1218,119 @@ function renderVacuum(list) {
     ana.textContent = "analyze " + ago(t.analyzeAgo);
     meta.append(dead, live, size, vac, ana);
 
-    const copy = button("Copy SQL", async () => {
-      await navigator.clipboard.writeText(t.vacuumSQL);
-    });
     const run = button("Run vacuum...", () => {
       maintConfirming = "vacuum:" + key;
       renderMaintenance();
     });
+    // One vacuum at a time: a second one would queue behind the first with no
+    // visible progress of its own.
+    run.disabled = vacuumBusy !== null;
 
-    cell.append(title, meta, buttonRow(copy, run));
+    cell.append(title, meta, buttonRow(run));
     box.append(cell);
   }
 }
 
+// vacuumBusy is set while a vacuum this app started is running; it drives the
+// progress panel and disables the buttons that would start another one.
+let vacuumBusy = null;
+
 async function runVacuumTable(t) {
   maintConfirming = null;
-  el("maint-status").textContent = "Running vacuum on " + t.schema + "." +
-    t.table + "; this can take a while...";
+  el("maint-status").textContent = "";
+  vacuumBusy = { schema: t.schema, table: t.table, phase: "", pct: 0, elapsed: 0 };
+  renderMaintenance();
+  renderVacuumProgress();
+
+  const timer = setInterval(pollVacuumProgress, 1000);
   try {
     maint = await window.vacuumTable(t.schema, t.table);
   } catch (err) {
     el("maint-status").textContent = String(err);
     return;
+  } finally {
+    clearInterval(timer);
+    vacuumBusy = null;
+    renderVacuumProgress();
   }
   renderMaintenance();
+}
+
+async function pollVacuumProgress() {
+  if (!vacuumBusy) return;
+  const p = await window.vacuumProgress();
+  if (!p.running || !vacuumBusy) return;
+  vacuumBusy = {
+    schema: p.schema,
+    table: p.table,
+    phase: p.phase,
+    pct: p.pct,
+    elapsed: p.elapsedSeconds,
+    blksDone: p.heapBlksDone,
+    blksTotal: p.heapBlksTotal,
+    indexPasses: p.indexPasses,
+  };
+  renderVacuumProgress();
+}
+
+// renderVacuumProgress owns its own element so polling never rebuilds the
+// whole screen underneath the user.
+function renderVacuumProgress() {
+  const box = el("vacuum-progress");
+  if (!vacuumBusy) {
+    box.hidden = true;
+    box.replaceChildren();
+    return;
+  }
+
+  const b = vacuumBusy;
+  box.hidden = false;
+  box.className = "cell";
+  box.replaceChildren();
+
+  const title = document.createElement("div");
+  title.className = "conn-title";
+  title.textContent = "Vacuuming " + b.schema + "." + b.table;
+
+  const meta = document.createElement("div");
+  meta.className = "idx-meta";
+  const phase = document.createElement("span");
+  // The phase is empty until the server registers the vacuum in its progress
+  // view, which takes a moment on a big table.
+  phase.textContent = b.phase ? b.phase : "starting";
+  meta.append(phase);
+  const elapsed = document.createElement("span");
+  elapsed.textContent = Math.round(b.elapsed) + "s elapsed";
+  meta.append(elapsed);
+
+  // Only the heap scan has a meaningful percentage. Once vacuum moves on to
+  // the indexes, the heap counters sit at 100% while minutes of work remain,
+  // so the bar goes indeterminate instead of claiming the job is done.
+  const scanning = b.phase === "scanning heap";
+  if (b.blksTotal > 0 && scanning) {
+    const blks = document.createElement("span");
+    blks.textContent = b.blksDone.toLocaleString() + " of " +
+      b.blksTotal.toLocaleString() + " blocks (" + b.pct + "%)";
+    meta.append(blks);
+  }
+  if (b.indexPasses > 0) {
+    const passes = document.createElement("span");
+    passes.textContent = "index pass " + b.indexPasses;
+    meta.append(passes);
+  }
+
+  const track = document.createElement("div");
+  track.className = "progress-track";
+  const fill = document.createElement("div");
+  fill.className = "progress-fill";
+  if (scanning && b.pct > 0) {
+    fill.style.width = b.pct + "%";
+  } else {
+    fill.classList.add("indeterminate");
+  }
+  track.append(fill);
+
+  box.append(title, meta, track);
 }
 
 function renderSequences(list) {

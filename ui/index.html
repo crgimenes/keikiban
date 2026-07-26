@@ -149,6 +149,35 @@
     }
     .sql-bar span { height: 100%; }
 
+    /* Progress of a long action */
+    .progress-track {
+      height: 0.5rem;
+      border-radius: 0.25rem;
+      background: rgba(127, 127, 127, 0.25);
+      overflow: hidden;
+      margin-top: 0.4rem;
+    }
+    .progress-fill {
+      height: 100%;
+      background: light-dark(#1e88e5, #64b5f6);
+      transition: width 0.4s linear;
+    }
+    /* Before the server reports a percentage, the bar animates to show the
+       action is alive rather than pretending to know how far it got. */
+    .progress-fill.indeterminate {
+      width: 30%;
+      animation: slide 1.4s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0% { margin-left: 0; }
+      50% { margin-left: 70%; }
+      100% { margin-left: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .progress-fill.indeterminate { animation: none; width: 100%; opacity: 0.5; }
+    }
+    button[disabled] { opacity: 0.5; }
+
     /* Blocking tree */
     .blocked-item {
       margin-top: 0.5rem;
@@ -246,7 +275,7 @@
         file is untouched.</p>
       <div class="buttons">
         <button type="button" id="confirm-cancel">Cancel</button>
-        <button type="button" id="confirm-remove" class="destructive">Remove</button>
+        <button type="button" id="confirm-remove" class="destructive">Confirm deletion</button>
       </div>
     </div>
     <p id="result" aria-live="polite"></p>
@@ -325,6 +354,7 @@
       </div>
     </div>
     <p id="idx-status" class="hint" aria-live="polite"></p>
+    <div id="idx-progress" hidden></div>
     <p id="idx-summary"></p>
 
     <h3>Invalid indexes</h3>
@@ -377,6 +407,7 @@
     <h3>Dead rows</h3>
     <p class="hint">Rows already deleted or replaced, still occupying space
       until vacuum reclaims them. Estimates from the statistics collector.</p>
+    <div id="vacuum-progress" hidden></div>
     <div id="maint-vacuum"></div>
 
     <h3>Sequences</h3>
