@@ -4,6 +4,11 @@
 # Binaries for programs and plugins
 /keikiban
 *.exe
+
+# Release script: carries signing details and lives outside the repo.
+release.sh
+# Release artifacts
+/dist/
 *.exe~
 *.dll
 *.so
@@ -26,6 +31,8 @@ go.work
 go.work.sum
 
 # env file
+
+.DS_Store
 .env
 
 # Editor/IDE

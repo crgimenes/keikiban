@@ -112,6 +112,7 @@ type Sampler struct {
 	missing   []string
 	preloaded []string // subset of missing already in shared_preload_libraries
 	maxConns  int
+	dbCount   int
 	cancel    context.CancelFunc
 	done      chan struct{}
 
@@ -193,10 +194,15 @@ func (s *Sampler) sampleUntilError(ctx context.Context, url string) error {
 	if err != nil {
 		return err
 	}
+	dbCount, err := databaseCount(ctx, conn)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	s.missing = missing
 	s.preloaded = preloaded
 	s.maxConns = maxConns
+	s.dbCount = dbCount
 	s.status = "sampling"
 	s.mu.Unlock()
 	debugf("event=sampler_connected missing_extensions=%q preloaded=%q max_connections=%d",
@@ -387,6 +393,16 @@ func (s *Sampler) sampleCounters(ctx context.Context, conn *pgx.Conn, smp *sampl
 	s.prevBlksHit = blksHit
 	s.prevValid = true
 	return nil
+}
+
+func databaseCount(ctx context.Context, conn *pgx.Conn) (int, error) {
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+
+	n := 0
+	err := conn.QueryRow(qctx,
+		`SELECT count(*) FROM pg_database WHERE NOT datistemplate;`).Scan(&n)
+	return n, err
 }
 
 func maxConnections(ctx context.Context, conn *pgx.Conn) (int, error) {
@@ -580,11 +596,11 @@ type bucketOut struct {
 	V map[string]float64 `json:"v"`
 }
 
-// topSQLOut ranks one query by its share of the sampled load. ByClass splits
-// that load across wait classes, Performance Insights style, so the per-query
-// bar can reuse the chart colors.
+// topSQLOut ranks one entry of the selected Top dimension (a query, a user, a
+// host, ...) by its share of the sampled load. ByClass splits that load across
+// wait classes, Performance Insights style, so the bar reuses the chart colors.
 type topSQLOut struct {
-	Query   string             `json:"query"`
+	Query   string             `json:"query"` // the entry key: query text, user name, ...
 	AAS     float64            `json:"aas"`
 	Pct     float64            `json:"pct"`
 	ByClass map[string]float64 `json:"byClass"`
@@ -612,6 +628,7 @@ type dashOut struct {
 	// UI distinguish "sampling an idle database" from "not sampling at all".
 	Samples int    `json:"samples"`
 	SliceBy string `json:"sliceBy"`
+	TopBy   string `json:"topBy"`
 	// Classes are the chart series for the current slice dimension;
 	// WaitClasses are always wait events, for the Top SQL breakdown.
 	Classes     []string    `json:"classes"`
@@ -627,10 +644,13 @@ type dashOut struct {
 	ConnClasses    []string    `json:"connClasses"`
 	Conns          []bucketOut `json:"conns"`
 	MaxConnections int         `json:"maxConnections"`
-	TPSClasses     []string    `json:"tpsClasses"`
-	TPS            []bucketOut `json:"tps"`
-	IOClasses      []string    `json:"ioClasses"`
-	IO             []bucketOut `json:"io"`
+	// DatabaseCount tells the UI whether per-database views are worth
+	// offering: a single-database cluster has nothing to compare.
+	DatabaseCount int         `json:"databaseCount"`
+	TPSClasses    []string    `json:"tpsClasses"`
+	TPS           []bucketOut `json:"tps"`
+	IOClasses     []string    `json:"ioClasses"`
+	IO            []bucketOut `json:"io"`
 
 	// Blocking is the live lock-wait tree (not bucketed): who blocks whom
 	// right now. Empty means nobody is waiting on a lock.
@@ -647,7 +667,7 @@ var (
 
 // Snapshot aggregates the sliding window ending now into chart buckets and a
 // top-SQL ranking.
-func (s *Sampler) Snapshot(now time.Time, windowSeconds int, sliceBy string) dashOut {
+func (s *Sampler) Snapshot(now time.Time, windowSeconds int, sliceBy, topBy string) dashOut {
 	s.mu.Lock()
 	samples := s.samples
 	status := s.status
@@ -657,7 +677,7 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int, sliceBy string) das
 	blocking := s.blocking
 	s.mu.Unlock()
 
-	out := aggregate(samples, now, windowSeconds, sliceBy)
+	out := aggregate(samples, now, windowSeconds, sliceBy, topBy)
 	enrichTopSQL(out.TopSQL, pgss, now.Add(-time.Duration(out.WindowSeconds)*time.Second))
 	out.Connected = status == "sampling"
 	out.Status = status
@@ -675,6 +695,7 @@ func (s *Sampler) Snapshot(now time.Time, windowSeconds int, sliceBy string) das
 	}
 	s.mu.Lock()
 	out.MaxConnections = s.maxConns
+	out.DatabaseCount = s.dbCount
 	s.mu.Unlock()
 	return out
 }
@@ -741,7 +762,7 @@ func rankAndFold(seen map[string]bool, total map[string]int) ([]string, func(str
 // past never redraws differently between refreshes. The in-progress bucket is
 // not charted at all — its average wobbles as samples arrive, which reads as
 // the chart rewriting itself; it appears once its period closes.
-func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy string) dashOut {
+func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topBy string) dashOut {
 	if windowSeconds < chartBuckets {
 		windowSeconds = chartBuckets
 	}
@@ -769,8 +790,9 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy strin
 	// Top SQL bars always break a query down by what it waited on.
 	waitSeen := map[string]bool{}
 	waitTotal := map[string]int{}
-	queryCount := map[string]int{}
-	queryByClass := map[string]map[string]int{}
+	// The Top list groups by its own dimension, independent of the chart's.
+	topCount := map[string]int{}
+	topByWait := map[string]map[string]int{}
 	queryIDOf := map[string]int64{}
 	totalSamples := 0
 	totalRows := 0
@@ -807,16 +829,17 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy strin
 			waitSeen[row.class] = true
 			waitTotal[row.class]++
 			totalRows++
-			if row.query == "" {
-				continue
+
+			topKey := sliceKey(row, topBy)
+			topCount[topKey]++
+			if topByWait[topKey] == nil {
+				topByWait[topKey] = map[string]int{}
 			}
-			queryCount[row.query]++
-			if queryByClass[row.query] == nil {
-				queryByClass[row.query] = map[string]int{}
-			}
-			queryByClass[row.query][row.class]++
-			if row.queryID != 0 {
-				queryIDOf[row.query] = row.queryID
+			topByWait[topKey][row.class]++
+			// The query id only identifies a query, so pg_stat_statements
+			// enrichment applies to the SQL dimension alone.
+			if topBy == "sql" && row.queryID != 0 {
+				queryIDOf[topKey] = row.queryID
 			}
 		}
 	}
@@ -885,12 +908,12 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy strin
 	}
 
 	var top []topSQLOut
-	for q, n := range queryCount {
+	for q, n := range topCount {
 		entry := topSQLOut{Query: q, ByClass: map[string]float64{}, queryID: queryIDOf[q]}
 		if totalSamples > 0 {
 			entry.AAS = round2(float64(n) / float64(totalSamples))
 			merged := map[string]int{}
-			for class, cn := range queryByClass[q] {
+			for class, cn := range topByWait[q] {
 				merged[mapWait(class)] += cn
 			}
 			for class, cn := range merged {
@@ -922,6 +945,7 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy strin
 		WindowSeconds: windowSeconds,
 		BucketSeconds: bucketSeconds,
 		SliceBy:       sliceBy,
+		TopBy:         topBy,
 		Samples:       totalSamples,
 		Classes:       classes,
 		WaitClasses:   waitClasses,

@@ -19,7 +19,8 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       # No GUI and no database in CI: every test is headless-safe by design.
-      - run: go test -count=1 -timeout 120s ./...
+      # -count=1 so a cached result never stands in for a real run.
+      - run: go test -count=1 -race -timeout 120s ./...
 
   cross:
     name: cross-compile
@@ -30,7 +31,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      # windows/386 is excluded: glaze's WebView2 layer has no 386 shim.
+      # windows/386 is excluded on purpose: glaze's WebView2 layer has no 386
+      # shim, so the release targets stop at amd64 and arm64.
       - run: |
           for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
             echo "build $target"
@@ -56,3 +58,28 @@ jobs:
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
       - run: golangci-lint run ./...
+
+  security:
+    name: gosec
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      # Audited findings carry an explicit // #nosec Gxxx; a bare nosec is
+      # not accepted here.
+      - run: gosec -quiet ./...
+
+  ui:
+    name: ui-syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # The interface is plain JS with no build step, so nothing else would
+      # catch a syntax error before it reaches the window at runtime.
+      - run: node --check ui/app.js
+      - run: node --check tools/uimock/mock.js

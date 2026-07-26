@@ -109,6 +109,20 @@ func runJSON(cfg Config, configErr string, args []string) {
 			os.Exit(1)
 		}
 		_ = enc.Encode(map[string]any{"blocking": tree})
+	case "sessions":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		out := collectSessions(context.Background(), cfg.Connections[0].URL)
+		_ = enc.Encode(out)
+		if out.Error != "" {
+			os.Exit(1)
+		}
 	case "maintenance":
 		if configErr != "" {
 			_ = enc.Encode(map[string]string{"error": configErr})
@@ -126,7 +140,7 @@ func runJSON(cfg Config, configErr string, args []string) {
 	default:
 		_ = enc.Encode(map[string]any{
 			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections", "indexes", "locks", "maintenance"},
+			"commands": []string{"connections", "indexes", "locks", "maintenance", "sessions"},
 		})
 		os.Exit(1)
 	}
@@ -139,6 +153,8 @@ type uiState struct {
 	Exists      bool         `json:"exists"`
 	Error       string       `json:"error,omitempty"`
 	Connections []Connection `json:"connections"`
+	// Active is the index of the one connection in use; -1 when none.
+	Active int `json:"active"`
 }
 
 // testResult reports a connection attempt. Failure is data, not a rejected
@@ -159,24 +175,46 @@ func runGUI(cfg Config, configErr string) {
 	}
 	defer w.Destroy()
 
-	// Sized for the setup/list screens; user-resizable with a sane floor.
 	// Dashboard-sized; user-resizable with a sane floor.
 	w.SetTitle("keikiban")
 	w.SetSize(1200, 860, glaze.HintNone)
 	w.SetSize(560, 480, glaze.HintMin)
 
-	// mu guards cfg, configErr and the sampler: Bind callbacks run on
-	// background goroutines and may overlap.
+	// mu guards cfg, configErr, activeIndex and the sampler: Bind callbacks
+	// run on background goroutines and may overlap.
 	var mu sync.Mutex
 	var sampler *Sampler
 	samplerURL := ""
+	// activeIndex is the one connection keikiban is attached to. Exactly one
+	// at a time, on purpose: with several open at once it is too easy to run
+	// a command against production while believing you are on staging.
+	// A fresh start always attaches to the first (the default).
+	activeIndex := 0
 
-	// ensureSampler keeps one sampler alive for the default (first)
-	// connection, restarting it when that connection changes. Callers hold mu.
+	// activeConn returns the connection in use. Callers hold mu.
+	activeConn := func() (Connection, bool) {
+		if activeIndex < 0 || activeIndex >= len(cfg.Connections) {
+			return Connection{}, false
+		}
+		return cfg.Connections[activeIndex], true
+	}
+
+	// activeURL is the shortcut every screen uses to reach the server.
+	activeURL := func() (string, bool) {
+		conn, ok := activeConn()
+		return conn.URL, ok
+	}
+
+	// ensureSampler keeps one sampler alive for the active connection and
+	// restarts it whenever that connection changes. Callers hold mu.
 	ensureSampler := func() {
+		if activeIndex >= len(cfg.Connections) {
+			activeIndex = 0
+		}
 		want := ""
-		if len(cfg.Connections) > 0 {
-			want = cfg.Connections[0].URL
+		conn, ok := activeConn()
+		if ok {
+			want = conn.URL
 		}
 		if want == samplerURL {
 			return
@@ -188,7 +226,16 @@ func runGUI(cfg Config, configErr string) {
 		samplerURL = want
 		if want != "" {
 			sampler = newSampler(want)
+			debugf("event=connected index=%d title=%q url=%s",
+				activeIndex, conn.Title, conn.MaskedURL)
 		}
+		// The window title names the attached database, so even the OS
+		// window switcher says which server a keystroke would reach.
+		title := "keikiban"
+		if ok && conn.Title != "" {
+			title = "keikiban - " + conn.Title
+		}
+		w.Dispatch(func() { w.SetTitle(title) })
 	}
 	ensureSampler()
 	defer func() {
@@ -202,11 +249,16 @@ func runGUI(cfg Config, configErr string) {
 		if cfg.Connections == nil {
 			cfg.Connections = []Connection{}
 		}
+		active := activeIndex
+		if len(cfg.Connections) == 0 {
+			active = -1
+		}
 		return uiState{
 			Path:        cfg.Path,
 			Exists:      cfg.Exists,
 			Error:       configErr,
 			Connections: cfg.Connections,
+			Active:      active,
 		}
 	}
 
@@ -219,7 +271,23 @@ func runGUI(cfg Config, configErr string) {
 		log.Fatal(err)
 	}
 
-	err = w.Bind("dashboardState", func(windowSeconds int, sliceBy string) (dashOut, error) {
+	// connectTo attaches to one connection and, by doing so, detaches from
+	// the previous one: keikiban is never attached to two servers at once.
+	err = w.Bind("connectTo", func(index int) (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if index < 0 || index >= len(cfg.Connections) {
+			return uiState{}, fmt.Errorf("connection %d does not exist", index)
+		}
+		activeIndex = index
+		ensureSampler()
+		return state(), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("dashboardState", func(windowSeconds int, sliceBy, topBy string) (dashOut, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if sampler == nil {
@@ -240,9 +308,10 @@ func runGUI(cfg Config, configErr string) {
 				Blocking:         []blockerOut{},
 			}, nil
 		}
-		out := sampler.Snapshot(time.Now(), windowSeconds, sliceBy)
-		out.Title = cfg.Connections[0].Title
-		out.URL = cfg.Connections[0].MaskedURL
+		out := sampler.Snapshot(time.Now(), windowSeconds, sliceBy, topBy)
+		conn, _ := activeConn()
+		out.Title = conn.Title
+		out.URL = conn.MaskedURL
 		return out, nil
 	})
 	if err != nil {
@@ -274,7 +343,7 @@ func runGUI(cfg Config, configErr string) {
 			report.Error = "no connections configured"
 			return report, nil
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		return collectIndexReport(context.Background(), dbURL), nil
 	})
@@ -290,9 +359,26 @@ func runGUI(cfg Config, configErr string) {
 			mu.Unlock()
 			return fmt.Errorf("no connections configured")
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		return cancelBackend(context.Background(), dbURL, pid, terminate)
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("sessionList", func() (sessionsOut, error) {
+		mu.Lock()
+		if len(cfg.Connections) == 0 {
+			mu.Unlock()
+			return sessionsOut{
+				Error:    "no connections configured",
+				Sessions: []sessionOut{},
+			}, nil
+		}
+		dbURL, _ := activeURL()
+		mu.Unlock()
+		return collectSessions(context.Background(), dbURL), nil
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -306,7 +392,7 @@ func runGUI(cfg Config, configErr string) {
 			report.Error = "no connections configured"
 			return report, nil
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		return collectMaintenance(context.Background(), dbURL), nil
 	})
@@ -320,7 +406,7 @@ func runGUI(cfg Config, configErr string) {
 			mu.Unlock()
 			return vacuumProgressOut{}, nil
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		return collectVacuumProgress(context.Background(), dbURL), nil
 	})
@@ -334,7 +420,7 @@ func runGUI(cfg Config, configErr string) {
 			mu.Unlock()
 			return maintenanceReport{}, fmt.Errorf("no connections configured")
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		err := runVacuum(context.Background(), dbURL, schema, table)
 		if err != nil {
@@ -352,7 +438,7 @@ func runGUI(cfg Config, configErr string) {
 			mu.Unlock()
 			return indexReport{}, fmt.Errorf("no connections configured")
 		}
-		dbURL := cfg.Connections[0].URL
+		dbURL, _ := activeURL()
 		mu.Unlock()
 		err := dropIndex(context.Background(), dbURL, schema, name)
 		if err != nil {

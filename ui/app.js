@@ -50,6 +50,11 @@ const ICONS = {
   "arrow-left": '<path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>',
   warn: '<path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>',
   "pause-fill": '<path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>',
+  speedometer: '<path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.39.39 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.253-1.845 1.602-2.932 1.25C11.309 13.488 9.475 13 8 13c-1.474 0-3.31.488-4.615.911-1.087.352-2.49.003-2.932-1.25A8 8 0 0 1 0 10m8-7a7 7 0 0 0-6.603 9.329c.203.575.923.876 1.68.63C4.397 12.533 6.358 12 8 12s3.604.532 4.923.96c.757.245 1.477-.056 1.68-.631A7 7 0 0 0 8 3"/>',
+  activity: '<path fill-rule="evenodd" d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.208A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.15l-1.88 5.17a.5.5 0 0 1-.94 0L6 3.964 4.47 8.171A.5.5 0 0 1 4 8.5H.5a.5.5 0 0 1 0-1h3.15l1.88-5.17A.5.5 0 0 1 6 2"/>',
+  diagram: '<path fill-rule="evenodd" d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/>',
+  wrench: '<path d="M16 4.5a4.5 4.5 0 0 1-1.703 3.526L13 5l2.959-1.11q.04.3.041.61"/><path d="M11.5 9c.653 0 1.273-.139 1.833-.39L12 5.5 11 3l3.826-1.53A4.5 4.5 0 0 0 7.29 6.092l-6.116 5.096a2.583 2.583 0 1 0 3.638 3.638L9.908 8.71A4.5 4.5 0 0 0 11.5 9m-1.292-4.361-.596.893.809-.27a.25.25 0 0 1 .287.377l-.596.893.809-.27.158.475-1.5.5a.25.25 0 0 1-.287-.376l.596-.893-.809.27a.25.25 0 0 1-.287-.377l.596-.893-.809.27-.158-.475 1.5-.5a.25.25 0 0 1 .287.376M3 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>',
+  list: '<path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>',
   "play-fill": '<path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>',
 };
 
@@ -65,17 +70,57 @@ function icon(name) {
 
 let state = { path: "", exists: false, error: "", connections: [] };
 // editingIndex: null = form closed, -1 = adding, >= 0 = editing that entry.
+// It only applies to the connections screen.
 let editingIndex = null;
-// listOpen: the connections editor is open on top of the dashboard.
-let listOpen = false;
-// indexesOpen / maintOpen: a report screen is open on top of the dashboard.
-let indexesOpen = false;
-let maintOpen = false;
+
+// One screen at a time, chosen in the sidebar. The dashboard is home.
+const SCREEN_KEY = "keikiban.screen";
+const SCREENS = ["dashboard", "sessions", "indexes", "maintenance", "connections"];
+let screen = localStorage.getItem(SCREEN_KEY) || "dashboard";
+if (!SCREENS.includes(screen)) screen = "dashboard";
+
+const NAV_ICONS = {
+  dashboard: "speedometer",
+  sessions: "activity",
+  indexes: "diagram",
+  maintenance: "wrench",
+  connections: "gear",
+};
+
+const NAV_COLLAPSED_KEY = "keikiban.navCollapsed";
+let navCollapsed = localStorage.getItem(NAV_COLLAPSED_KEY) === "1";
+
+// loadScreen fetches what a report screen shows. Startup needs it as much as
+// navigation does: reopening on a report screen must not land on an empty one.
+function loadScreen(name) {
+  if (name === "sessions") loadSessions();
+  if (name === "indexes") loadIndexes();
+  if (name === "maintenance") loadMaintenance();
+}
+
+function goTo(name) {
+  screen = name;
+  localStorage.setItem(SCREEN_KEY, name);
+  render();
+  loadScreen(name);
+}
 
 const WINDOW_KEY = "keikiban.window";
 let windowSeconds = Number(localStorage.getItem(WINDOW_KEY)) || 300;
 const SLICE_KEY = "keikiban.sliceBy";
 let sliceBy = localStorage.getItem(SLICE_KEY) || "waits";
+const TOP_KEY = "keikiban.topBy";
+let topBy = localStorage.getItem(TOP_KEY) || "sql";
+
+// Heading per Top dimension; the tab labels are in the page.
+const TOP_TITLES = {
+  sql: "Top SQL",
+  waits: "Top waits",
+  users: "Top users",
+  hosts: "Top hosts",
+  applications: "Top applications",
+  databases: "Top databases",
+};
 
 // Wait events are open-ended ("IO:WALSync", "LWLock:WALWrite", ...), so
 // colors are assigned by name hash from a fixed palette; only the two anchors
@@ -123,23 +168,52 @@ function renderCell(conn, i) {
     badge.textContent = "default";
     title.append(badge);
   }
+  if (i === state.active) {
+    const badge = document.createElement("span");
+    badge.className = "conn-default";
+    badge.textContent = "connected";
+    title.append(badge);
+  }
 
   const edit = button("", () => openForm(i), "pencil");
   edit.classList.add("icon-only");
   edit.title = "Edit";
   edit.setAttribute("aria-label", "Edit");
 
-  cell.append(title, buttonRow(edit));
+  const row = buttonRow(edit);
+  if (i !== state.active) {
+    // Attaching here detaches from the current one: exactly one open server,
+    // so a command can never land on the database you were not looking at.
+    row.append(button("Connect", () => connectToIndex(i), "plug"));
+  }
+  cell.append(title, row);
   return cell;
 }
 
+async function connectToIndex(index) {
+  try {
+    state = await window.connectTo(index);
+  } catch (err) {
+    showResult(String(err));
+    return;
+  }
+  // Reports belong to the previous server; drop them so nothing stale is
+  // read as if it came from the new one.
+  idxReport = null;
+  maint = null;
+  sessions = null;
+  goTo("dashboard");
+}
+
 function render() {
+  const sections = ["setup", "list", "dashboard", "sessions", "indexes",
+    "maintenance"];
+  const hideAll = () => sections.forEach((id) => { el(id).hidden = true; });
+
   el("config-error-box").hidden = !state.error;
   if (state.error) {
     el("config-error").textContent = state.error;
-    el("setup").hidden = true;
-    el("list").hidden = true;
-    el("dashboard").hidden = true;
+    hideAll();
     return;
   }
 
@@ -149,10 +223,21 @@ function render() {
   // configured means keikiban asks for one, whether the file is missing,
   // empty, or holds only comments.
   const unconfigured = state.connections.length === 0;
-  if (unconfigured && editingIndex === null) editingIndex = -1;
-  const formOpen = editingIndex !== null;
+  if (unconfigured) {
+    screen = "connections";
+    if (editingIndex === null) editingIndex = -1;
+  }
+  const formOpen = screen === "connections" && editingIndex !== null;
 
-  el("setup").hidden = !formOpen;
+  hideAll();
+  if (formOpen) {
+    el("setup").hidden = false;
+  } else if (screen === "connections") {
+    el("list").hidden = false;
+  } else {
+    el(screen).hidden = false;
+  }
+
   el("first-run-note").hidden = !unconfigured;
   el("cancel").hidden = unconfigured;
   // Deleting is a form of editing: the destructive action lives here, not in
@@ -160,12 +245,23 @@ function render() {
   el("delete").hidden = editingIndex === null || editingIndex < 0;
   el("setup-heading").textContent =
     editingIndex >= 0 ? "Edit connection" : "Add a PostgreSQL connection";
-  el("list").hidden = formOpen || !listOpen;
-  el("back").hidden = false;
-  const overlay = formOpen || listOpen;
-  el("indexes").hidden = overlay || !indexesOpen;
-  el("maintenance").hidden = overlay || !maintOpen;
-  el("dashboard").hidden = overlay || indexesOpen || maintOpen;
+
+  for (const b of document.querySelectorAll(".nav-item[data-screen]")) {
+    if (b.dataset.screen === screen) {
+      b.setAttribute("aria-current", "page");
+    } else {
+      b.removeAttribute("aria-current");
+    }
+  }
+  applyNarrow();
+
+  const attached = state.connections[state.active];
+  el("attached").hidden = !attached;
+  if (attached) {
+    el("attached-name").textContent = attached.title;
+    el("attached").title = "Connected to " + attached.title +
+      ". Only one connection is open at a time.";
+  }
 
   const box = el("connections");
   box.replaceChildren();
@@ -259,7 +355,7 @@ let dash = null;
 async function refreshDashboard() {
   if (el("dashboard").hidden || paused) return;
   try {
-    dash = await window.dashboardState(windowSeconds, sliceBy);
+    dash = await window.dashboardState(windowSeconds, sliceBy, topBy);
   } catch (err) {
     el("dash-status").textContent = String(err);
     return;
@@ -288,6 +384,17 @@ async function refreshDashboard() {
   for (const b of document.querySelectorAll(".win")) {
     b.setAttribute("aria-pressed", String(Number(b.dataset.window) === windowSeconds));
   }
+  for (const b of document.querySelectorAll(".tab")) {
+    b.setAttribute("aria-pressed", String(b.dataset.top === topBy));
+  }
+  // A single-database cluster has nothing to say per database; the tab only
+  // appears where it can actually answer "which database loads the server".
+  el("tab-databases").hidden = dash.databaseCount < 2;
+  if (dash.databaseCount < 2 && topBy === "databases") {
+    topBy = "sql";
+    localStorage.setItem(TOP_KEY, topBy);
+  }
+  el("top-heading").firstChild.textContent = (TOP_TITLES[topBy] || "Top") + " ";
   drawChart();
   drawCounters();
   renderLegend();
@@ -642,8 +749,10 @@ function renderTopSQL() {
       seg.title = cls;
       bar.append(seg);
     }
+    // A statement gets monospace and wrapping; a user or host name is a
+    // short label and reads better as plain text.
     const text = document.createElement("div");
-    text.className = "sql-text";
+    text.className = dash.topBy === "sql" ? "sql-text" : "top-label";
     text.textContent = q.query;
     cell.append(load, bar, text);
     box.append(cell);
@@ -737,6 +846,16 @@ for (const b of document.querySelectorAll(".win")) {
   });
 }
 
+for (const b of document.querySelectorAll(".tab")) {
+  b.addEventListener("click", () => {
+    topBy = b.dataset.top;
+    localStorage.setItem(TOP_KEY, topBy);
+    paused = false;
+    renderPause();
+    refreshDashboard();
+  });
+}
+
 el("slice-by").value = sliceBy;
 el("slice-by").addEventListener("change", () => {
   sliceBy = el("slice-by").value;
@@ -746,14 +865,6 @@ el("slice-by").addEventListener("change", () => {
   refreshDashboard();
 });
 
-el("connections-btn").addEventListener("click", () => {
-  listOpen = true;
-  render();
-});
-el("back").addEventListener("click", () => {
-  listOpen = false;
-  render();
-});
 
 // --- Index health screen ---
 
@@ -975,15 +1086,6 @@ async function runDropIndex(e) {
   renderIndexes();
 }
 
-el("indexes-btn").addEventListener("click", () => {
-  indexesOpen = true;
-  render();
-  loadIndexes();
-});
-el("idx-back").addEventListener("click", () => {
-  indexesOpen = false;
-  render();
-});
 el("idx-refresh").addEventListener("click", loadIndexes);
 
 // --- Maintenance screen ---
@@ -1386,15 +1488,6 @@ function renderSequences(list) {
   box.append(table);
 }
 
-el("maint-btn").addEventListener("click", () => {
-  maintOpen = true;
-  render();
-  loadMaintenance();
-});
-el("maint-back").addEventListener("click", () => {
-  maintOpen = false;
-  render();
-});
 el("maint-refresh").addEventListener("click", loadMaintenance);
 
 el("ext-badge").addEventListener("click", () => {
@@ -1425,16 +1518,199 @@ el("confirm-remove").addEventListener("click", () => {
   removeConnection(editingIndex);
 });
 
+// --- Sidebar ---
+
+for (const b of document.querySelectorAll(".nav-item[data-screen]")) {
+  const label = b.textContent;
+  b.replaceChildren(icon(NAV_ICONS[b.dataset.screen]));
+  const span = document.createElement("span");
+  span.textContent = label;
+  b.append(span);
+  b.title = label;
+  b.addEventListener("click", () => goTo(b.dataset.screen));
+}
+
+const collapseBtn = el("nav-collapse");
+collapseBtn.replaceChildren(icon("list"));
+collapseBtn.addEventListener("click", () => {
+  navCollapsed = !navCollapsed;
+  localStorage.setItem(NAV_COLLAPSED_KEY, navCollapsed ? "1" : "0");
+  render();
+});
+
+// A narrow window collapses the rail on its own and restores the user's
+// choice when there is room again: their preference is remembered, not
+// overwritten by a resize.
+const NARROW = window.matchMedia("(max-width: 60rem)");
+
+function applyNarrow() {
+  const forced = NARROW.matches;
+  document.body.classList.toggle("nav-forced-collapsed", forced);
+  collapseBtn.disabled = forced;
+  document.body.classList.toggle("nav-collapsed", forced || navCollapsed);
+  collapseBtn.setAttribute("aria-expanded",
+    String(!(forced || navCollapsed)));
+}
+
+NARROW.addEventListener("change", applyNarrow);
+
+// --- Sessions screen ---
+
+let sessions = null;
+// sessConfirming: "cancel:<pid>" or "terminate:<pid>" under confirmation.
+let sessConfirming = null;
+
+async function loadSessions() {
+  el("sess-status").textContent = "Loading sessions...";
+  try {
+    sessions = await window.sessionList();
+  } catch (err) {
+    el("sess-status").textContent = String(err);
+    return;
+  }
+  renderSessions();
+}
+
+function renderSessions() {
+  if (!sessions) return;
+  el("sess-status").textContent = sessions.error || "";
+
+  const activeOnly = el("sess-active-only").checked;
+  const list = activeOnly
+    ? sessions.sessions.filter((s) => s.state === "active")
+    : sessions.sessions;
+
+  const box = el("sess-list");
+  box.replaceChildren();
+  if (list.length === 0) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = activeOnly
+      ? "No session is running a query right now."
+      : "No client sessions.";
+    box.append(note);
+    return;
+  }
+
+  for (const s of list) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    const title = document.createElement("div");
+    title.className = "conn-title";
+    title.textContent = "pid " + s.pid + " · " + (s.state || "unknown");
+    cell.append(title);
+
+    const meta = document.createElement("div");
+    meta.className = "idx-meta";
+    if (s.state === "active") {
+      const run = document.createElement("span");
+      run.textContent = "running for " + s.querySeconds.toFixed(1) + "s";
+      meta.append(run);
+    } else {
+      const idle = document.createElement("span");
+      idle.textContent = s.state + " for " + s.stateSeconds.toFixed(1) + "s";
+      if (s.state.startsWith("idle in transaction")) {
+        idle.classList.add("warn-text");
+      }
+      meta.append(idle);
+    }
+    if (s.blocked) {
+      const blocked = document.createElement("span");
+      blocked.className = "warn-text";
+      blocked.textContent = "blocked by another session";
+      meta.append(blocked);
+    }
+    if (s.waitEvent) {
+      const w = document.createElement("span");
+      w.textContent = s.waitEvent;
+      meta.append(w);
+    }
+    const who = document.createElement("span");
+    who.textContent = [s.user, s.app, s.host, s.database]
+      .filter(Boolean).join(" · ");
+    meta.append(who);
+    cell.append(meta);
+
+    if (s.query) {
+      const q = document.createElement("div");
+      q.className = "sql-text";
+      q.textContent = s.query;
+      cell.append(q);
+    }
+
+    cell.append(sessionActions(s));
+    box.append(cell);
+  }
+}
+
+function sessionActions(s) {
+  const key = sessConfirming ? sessConfirming.split(":") : null;
+  if (key && Number(key[1]) === s.pid) {
+    const terminate = key[0] === "terminate";
+    const wrap = document.createElement("div");
+    const q = document.createElement("div");
+    q.textContent = terminate
+      ? "Terminate connection " + s.pid + "? Its transaction is rolled back " +
+        "and the client is disconnected."
+      : "Cancel the running query of pid " + s.pid + "? The transaction stays " +
+        "open until the client commits or rolls back.";
+    const stmt = document.createElement("div");
+    stmt.className = "sql-text";
+    const sql = terminate ? s.terminateSQL : s.cancelSQL;
+    stmt.textContent = sql;
+    const copy = button("Copy SQL", async () => {
+      await navigator.clipboard.writeText(sql);
+    });
+    const act = button(terminate ? "Confirm termination" : "Confirm cancellation",
+      () => runSessionSignal(s, terminate));
+    act.classList.add("destructive");
+    wrap.append(q, stmt, buttonRow(
+      copy,
+      button("Back", () => {
+        sessConfirming = null;
+        renderSessions();
+      }),
+      act,
+    ));
+    return wrap;
+  }
+
+  const cancelBtn = button("Cancel query...", () => {
+    sessConfirming = "cancel:" + s.pid;
+    renderSessions();
+  });
+  cancelBtn.classList.add("destructive");
+  cancelBtn.disabled = s.state !== "active";
+  const termBtn = button("Terminate...", () => {
+    sessConfirming = "terminate:" + s.pid;
+    renderSessions();
+  });
+  termBtn.classList.add("destructive");
+  return buttonRow(cancelBtn, termBtn);
+}
+
+async function runSessionSignal(s, terminate) {
+  sessConfirming = null;
+  try {
+    await window.signalBackend(s.pid, terminate);
+  } catch (err) {
+    el("sess-status").textContent = String(err);
+    return;
+  }
+  loadSessions();
+}
+
+el("sess-refresh").addEventListener("click", loadSessions);
+el("sess-active-only").addEventListener("change", renderSessions);
+
 el("test").prepend(icon("plug"));
 el("add").prepend(icon("plus-lg"));
 el("delete").prepend(icon("trash"));
-el("back").prepend(icon("arrow-left"));
-el("idx-back").prepend(icon("arrow-left"));
-el("maint-back").prepend(icon("arrow-left"));
-el("connections-btn").prepend(icon("gear"));
 el("ext-badge").append(icon("warn"));
 
 (async () => {
   state = await window.configState();
   render();
+  loadScreen(screen);
 })();

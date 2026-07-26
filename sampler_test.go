@@ -28,7 +28,7 @@ func TestAggregate(t *testing.T) {
 		}},
 	}
 
-	out := aggregate(samples, now, window, "waits")
+	out := aggregate(samples, now, window, "waits", "sql")
 
 	if out.BucketSeconds != 3 {
 		t.Errorf("bucketSeconds = %d, want 3", out.BucketSeconds)
@@ -114,7 +114,7 @@ func TestAggregateFoldsTailIntoOther(t *testing.T) {
 	}
 	samples := []sample{{at: now.Add(-5 * time.Second), rows: rows}}
 
-	out := aggregate(samples, now, 300, "waits")
+	out := aggregate(samples, now, 300, "waits", "sql")
 
 	if len(out.Classes) != chartClassLimit+1 {
 		t.Fatalf("classes = %d (%v), want %d + Other",
@@ -144,8 +144,8 @@ func TestAggregateStableBuckets(t *testing.T) {
 		{class: "CPU", query: "SELECT 1"},
 	}}}
 
-	a := aggregate(samples, base, 300, "waits")
-	b := aggregate(samples, base.Add(2*time.Second), 300, "waits")
+	a := aggregate(samples, base, 300, "waits", "sql")
+	b := aggregate(samples, base.Add(2*time.Second), 300, "waits", "sql")
 
 	find := func(out dashOut) *bucketOut {
 		for i := range out.Buckets {
@@ -214,7 +214,7 @@ func TestAggregateSliceBy(t *testing.T) {
 		{class: "CPU", query: "SELECT 2", user: "alice", db: "other", host: ""},
 	}}}
 
-	byUser := aggregate(samples, now, 300, "users")
+	byUser := aggregate(samples, now, 300, "users", "sql")
 	if len(byUser.Classes) != 2 || byUser.Classes[0] != "alice" {
 		t.Errorf("classes by user = %v, want alice first", byUser.Classes)
 	}
@@ -230,20 +230,57 @@ func TestAggregateSliceBy(t *testing.T) {
 		t.Errorf("top SQL lost its wait breakdown: %+v", byUser.TopSQL[0])
 	}
 
-	byDB := aggregate(samples, now, 300, "databases")
+	byDB := aggregate(samples, now, 300, "databases", "sql")
 	if byDB.Buckets[chartBuckets-1].V["app"] != 2 {
 		t.Errorf("by database = %v, want app 2", byDB.Buckets[chartBuckets-1].V)
 	}
 
 	// An empty dimension value is labelled, never dropped or blank.
-	byHost := aggregate(samples, now, 300, "hosts")
+	byHost := aggregate(samples, now, 300, "hosts", "sql")
 	if byHost.Buckets[chartBuckets-1].V["(unset)"] != 1 {
 		t.Errorf("by host = %v, want one (unset)", byHost.Buckets[chartBuckets-1].V)
 	}
 }
 
+// TestAggregateTopBy checks the Top list ranks by its own dimension,
+// independently of what the chart is sliced by.
+func TestAggregateTopBy(t *testing.T) {
+	now := time.Date(2026, 7, 25, 12, 0, 2, 0, time.UTC)
+	samples := []sample{{at: now.Add(-5 * time.Second), rows: []activeRow{
+		{class: "CPU", query: "SELECT 1", user: "alice", app: "web", queryID: 7},
+		{class: "Lock", query: "UPDATE t", user: "alice", app: "batch", queryID: 9},
+		{class: "CPU", query: "SELECT 2", user: "bob", app: "web", queryID: 8},
+	}}}
+
+	// Chart by waits, Top by users: alice holds two of the three rows.
+	out := aggregate(samples, now, 300, "waits", "users")
+	if out.TopBy != "users" {
+		t.Errorf("topBy = %q, want users", out.TopBy)
+	}
+	if len(out.TopSQL) != 2 || out.TopSQL[0].Query != "alice" {
+		t.Fatalf("top = %+v, want alice first", out.TopSQL)
+	}
+	if out.TopSQL[0].AAS != 2 {
+		t.Errorf("alice AAS = %v, want 2", out.TopSQL[0].AAS)
+	}
+	// Her load still splits by wait class, and it spans both of them.
+	if out.TopSQL[0].ByClass["CPU"] != 1 || out.TopSQL[0].ByClass["Lock"] != 1 {
+		t.Errorf("alice byClass = %v, want CPU 1 and Lock 1", out.TopSQL[0].ByClass)
+	}
+	// A query id identifies a query, so it must not leak into other
+	// dimensions and enrich the wrong entry.
+	if out.TopSQL[0].queryID != 0 {
+		t.Errorf("non-SQL entry carries queryID %d", out.TopSQL[0].queryID)
+	}
+
+	byApp := aggregate(samples, now, 300, "waits", "applications")
+	if len(byApp.TopSQL) != 2 || byApp.TopSQL[0].Query != "web" {
+		t.Errorf("top by application = %+v, want web first", byApp.TopSQL)
+	}
+}
+
 func TestAggregateEmpty(t *testing.T) {
-	out := aggregate(nil, time.Now(), 300, "waits")
+	out := aggregate(nil, time.Now(), 300, "waits", "sql")
 	if len(out.Buckets) != chartBuckets {
 		t.Errorf("buckets = %d, want %d", len(out.Buckets), chartBuckets)
 	}

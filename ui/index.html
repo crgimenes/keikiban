@@ -4,14 +4,100 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>keikiban</title>
+  <link rel="icon" href="favicon.png" type="image/png">
   <style>
     /* Let the OS webview do the styling: native controls, native colors,
        native dark mode. Only layout lives here. Everything is sized in rem
        so the keyboard zoom (Cmd+/Cmd-) scales the whole page. */
     :root { color-scheme: light dark; }
+    /* Shell: a fixed nav rail plus the scrolling screen. Global navigation
+       lives in the rail; each screen keeps its own controls in its header. */
     body {
       font-family: system-ui, sans-serif;
       margin: 0;
+      display: flex;
+      min-height: 100vh;
+    }
+    #sidebar {
+      flex: 0 0 auto;
+      width: 11rem;
+      padding: 0.75rem 0.5rem;
+      border-right: 1px solid rgba(127, 127, 127, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    /* The toggle sits at the top left, where a hamburger is expected. */
+    #nav-top {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    #brand {
+      font-weight: 700;
+      opacity: 0.85;
+      white-space: nowrap;
+    }
+    .nav-toggle { padding: 0.4rem; }
+    .nav-item {
+      font: inherit;
+      text-align: left;
+      background: none;
+      border: 0;
+      border-radius: 0.35rem;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-item:hover { background: rgba(127, 127, 127, 0.18); }
+    .nav-item[aria-current="page"] {
+      background: rgba(127, 127, 127, 0.28);
+      font-weight: 600;
+    }
+    .nav-bottom { margin-top: auto; opacity: 0.7; }
+    /* The attached database is stated permanently: no screen, no keystroke
+       should ever leave a doubt about which server is on the other end. */
+    #attached {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.2rem 0.6rem 0.8rem;
+      font-size: 0.85rem;
+      overflow: hidden;
+    }
+    #attached-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #attached .dot {
+      width: 0.55em;
+      height: 0.55em;
+      border-radius: 50%;
+      background: light-dark(#2e7d32, #66bb6a);
+      flex-shrink: 0;
+    }
+    body.nav-collapsed #attached { justify-content: center; padding: 0.2rem 0 0.8rem; }
+    body.nav-collapsed #attached-name { display: none; }
+    /* Collapsed: icons only, labels hidden but still read by screen readers. */
+    body.nav-collapsed #sidebar { width: auto; }
+    body.nav-collapsed #brand { display: none; }
+    body.nav-collapsed .nav-item span { display: none; }
+    /* Collapsed by the window being narrow, not by the user: the toggle is
+       disabled rather than lying about a choice it cannot honour. */
+    body.nav-forced-collapsed .nav-toggle { opacity: 0.4; cursor: default; }
+    #content {
+      flex: 1 1 auto;
+      min-width: 0;
       padding: 1.25rem;
     }
     h1 { font-size: 1.3rem; margin-top: 0; }
@@ -146,6 +232,22 @@
       display: inline-block;
     }
     .sql-load { font-variant-numeric: tabular-nums; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .tab[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
+    /* Fixed height: the ranking changes every refresh, and a list that grows
+       and shrinks makes the whole page jump under the reader. */
+    #topsql {
+      height: 26rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    /* Only the SQL tab shows statements; other dimensions are short labels. */
+    .top-label { font-weight: 600; margin-top: 0.3rem; }
     .sql-text {
       font-family: ui-monospace, monospace;
       font-size: 0.85rem;
@@ -254,8 +356,24 @@
   </style>
 </head>
 <body>
-  <h1>keikiban</h1>
+  <nav id="sidebar" aria-label="Screens">
+    <div id="nav-top">
+      <button type="button" id="nav-collapse" class="nav-item nav-toggle"
+        aria-label="Toggle sidebar" title="Toggle sidebar"
+        aria-expanded="true"></button>
+      <div id="brand">keikiban</div>
+    </div>
+    <div id="attached" title="">
+      <span class="dot"></span><span id="attached-name"></span>
+    </div>
+    <button type="button" class="nav-item" data-screen="dashboard">Dashboard</button>
+    <button type="button" class="nav-item" data-screen="sessions">Sessions</button>
+    <button type="button" class="nav-item" data-screen="indexes">Indexes</button>
+    <button type="button" class="nav-item" data-screen="maintenance">Maintenance</button>
+    <button type="button" class="nav-item" data-screen="connections">Connections</button>
+  </nav>
 
+  <main id="content">
   <section id="config-error-box" hidden>
     <h2>Configuration error</h2>
     <p>The config file could not be loaded. Fix it and reopen keikiban.</p>
@@ -319,9 +437,6 @@
         </span>
         <button type="button" id="pause" class="icon-only"
           aria-label="Pause auto-refresh" title="Pause auto-refresh"></button>
-        <button type="button" id="indexes-btn">Indexes</button>
-        <button type="button" id="maint-btn">Maintenance</button>
-        <button type="button" id="connections-btn">Connections</button>
       </div>
     </div>
     <p id="dash-status" class="hint" aria-live="polite"></p>
@@ -365,9 +480,36 @@
     <h2>Blocking <span class="hint">who is waiting on whom, right now</span></h2>
     <div id="blocking"></div>
 
-    <h2>Top SQL <span class="hint">by share of active sessions in this
-      window</span></h2>
+    <h2 id="top-heading">Top SQL <span class="hint">by share of active
+      sessions in this window</span></h2>
+    <div class="tabs" role="group" aria-label="Top dimension">
+      <button type="button" class="tab" data-top="sql">SQL</button>
+      <button type="button" class="tab" data-top="waits">Waits</button>
+      <button type="button" class="tab" data-top="users">Users</button>
+      <button type="button" class="tab" data-top="hosts">Hosts</button>
+      <button type="button" class="tab" data-top="applications">Applications</button>
+      <button type="button" class="tab" id="tab-databases"
+        data-top="databases" hidden>Databases</button>
+    </div>
     <div id="topsql"></div>
+  </section>
+
+  <section id="sessions" hidden>
+    <div class="dash-header">
+      <h2>Sessions</h2>
+      <div class="buttons dash-actions">
+        <label class="slice-label">
+          <input type="checkbox" id="sess-active-only"> Active only
+        </label>
+        <button type="button" id="sess-refresh">Refresh</button>
+      </div>
+    </div>
+    <p id="sess-status" class="hint" aria-live="polite"></p>
+    <p class="hint">Every client session on the server, the busiest first.
+      Cancel stops the running query; the transaction stays open until the
+      client commits or rolls back. Terminate closes the connection and rolls
+      its transaction back.</p>
+    <div id="sess-list"></div>
   </section>
 
   <section id="indexes" hidden>
@@ -375,7 +517,6 @@
       <h2>Index health</h2>
       <div class="buttons dash-actions">
         <button type="button" id="idx-refresh">Refresh</button>
-        <button type="button" id="idx-back">Back</button>
       </div>
     </div>
     <p id="idx-status" class="hint" aria-live="polite"></p>
@@ -410,7 +551,6 @@
       <h2>Maintenance</h2>
       <div class="buttons dash-actions">
         <button type="button" id="maint-refresh">Refresh</button>
-        <button type="button" id="maint-back">Back</button>
       </div>
     </div>
     <p id="maint-status" class="hint" aria-live="polite"></p>
@@ -445,13 +585,14 @@
     <h2>Connections</h2>
     <div id="connections"></div>
     <div class="buttons">
-      <button type="button" id="back" hidden>Back</button>
       <button type="button" id="add">Add connection</button>
     </div>
     <p class="hint">The first connection is the default: it will load the
       dashboard when keikiban opens. Dashboard screens are under
       construction.</p>
   </section>
+
+  </main>
 
   <script src="app.js"></script>
 </body>
