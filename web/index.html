@@ -1,234 +1,397 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>keikiban — PostgreSQL dashboard</title>
-<meta name="description" content="A PostgreSQL dashboard that stays up when the database does not. Database load by wait event, top SQL, blocking, index health. One binary, no agent on the server.">
-<link rel="icon" href="favicon.png" type="image/png">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>keikiban — PostgreSQL dashboard</title>
+    <meta
+      name="description"
+      content="A PostgreSQL dashboard that stays up when the database does not. Database load by wait event, top SQL, blocking, index health. One binary, no agent on the server."
+    />
+    <link rel="icon" href="favicon.png" type="image/png" />
 
-<meta property="og:title" content="keikiban — PostgreSQL dashboard">
-<meta property="og:description" content="Database load by wait event, top SQL, blocking, index health. One binary, no agent on the server.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://crgimenes.github.io/keikiban/">
-<meta property="og:image" content="https://crgimenes.github.io/keikiban/social-preview.png">
-<meta property="og:image:width" content="1280">
-<meta property="og:image:height" content="640">
-<meta name="twitter:card" content="summary_large_image">
+    <meta property="og:title" content="keikiban — PostgreSQL dashboard" />
+    <meta
+      property="og:description"
+      content="Database load by wait event, top SQL, blocking, index health. One binary, no agent on the server."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://crgimenes.github.io/keikiban/" />
+    <meta
+      property="og:image"
+      content="https://crgimenes.github.io/keikiban/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
 
-<style>
-:root {
-  color-scheme: dark;
-  --bg: #0e1013;
-  --panel: #171a1f;
-  --line: #272c34;
-  --fg: #e6e8ec;
-  --dim: #9aa3af;
-  --accent: #26a69a;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  padding: 2rem 1rem 3rem;
-  background: var(--bg);
-  color: var(--fg);
-  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-/* Corner ribbon drawn in CSS rather than fetched, so the page needs nothing
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0e1013;
+        --panel: #171a1f;
+        --line: #272c34;
+        --fg: #e6e8ec;
+        --dim: #9aa3af;
+        --accent: #26a69a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 2rem 1rem 3rem;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          16px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+      }
+      /* Corner ribbon drawn in CSS rather than fetched, so the page needs nothing
    from the network. It scrolls away with the header instead of sitting fixed
    over the screenshots. */
-.ribbon {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 120px;
-  height: 120px;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 5;
-}
-.ribbon a {
-  position: absolute;
-  top: 27px;
-  left: -27px;
-  width: 176px;
-  padding: 6px 0;
-  transform: rotate(45deg);
-  background: var(--accent);
-  color: #062622;
-  font: 600 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  text-align: center;
-  text-decoration: none;
-  pointer-events: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
-}
-.ribbon a:hover { background: #4db6ac; }
-.ribbon a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+      .ribbon {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 120px;
+        height: 120px;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .ribbon a {
+        position: absolute;
+        top: 27px;
+        left: -27px;
+        width: 176px;
+        padding: 6px 0;
+        transform: rotate(45deg);
+        background: var(--accent);
+        color: #062622;
+        font:
+          600 11px/1.4 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        text-align: center;
+        text-decoration: none;
+        pointer-events: auto;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+      }
+      .ribbon a:hover {
+        background: #4db6ac;
+      }
+      .ribbon a:focus-visible {
+        outline: 2px solid var(--fg);
+        outline-offset: 2px;
+      }
 
-main { max-width: 1000px; margin: 0 auto; }
-header { display: flex; align-items: center; gap: 1rem; margin-bottom: .5rem; }
-header img { width: 72px; height: 72px; border-radius: 16px; }
-h1 { font-size: 1.9rem; margin: 0; letter-spacing: -.02em; }
-h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
-h3 { font-size: 1rem; margin: 1.5rem 0 .35rem; }
-.tagline { color: var(--dim); margin: .1rem 0 0; }
-a { color: var(--accent); }
-p { margin: 0 0 1rem; }
-figure { margin: 1.5rem 0; }
-figure img {
-  width: 100%;
-  display: block;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-figcaption { color: var(--dim); font-size: .9rem; margin-top: .5rem; }
-table { border-collapse: collapse; width: 100%; font-size: .95rem; }
-th, td { text-align: left; padding: .45rem .75rem .45rem 0; border-bottom: 1px solid var(--line); }
-th { color: var(--dim); font-weight: 600; }
-pre {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: .8rem 1rem;
-  overflow-x: auto;
-  font: .9rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
-.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 0 2rem; }
-.note { color: var(--dim); font-size: .9rem; }
-footer {
-  margin-top: 3rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--line);
-  color: var(--dim);
-  font-size: .9rem;
-}
-@media (max-width: 700px) {
-  .ribbon { display: none; }
-}
-@media (max-width: 640px) {
-  body { padding: 1rem .75rem 2rem; }
-  h1 { font-size: 1.4rem; }
-  header img { width: 52px; height: 52px; }
-}
-</style>
-</head>
-<body>
-<div class="ribbon"><a href="https://github.com/crgimenes/keikiban">Fork me on GitHub</a></div>
-<main>
-  <header>
-    <img src="favicon.png" alt="">
-    <div>
-      <h1>keikiban</h1>
-      <p class="tagline">A PostgreSQL dashboard that stays up when the database does not.</p>
+      main {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+      }
+      header img {
+        width: 72px;
+        height: 72px;
+        border-radius: 16px;
+      }
+      h1 {
+        font-size: 1.9rem;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 2.5rem 0 0.75rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 1.5rem 0 0.35rem;
+      }
+      .tagline {
+        color: var(--dim);
+        margin: 0.1rem 0 0;
+      }
+      a {
+        color: var(--accent);
+      }
+      p {
+        margin: 0 0 1rem;
+      }
+      figure {
+        margin: 1.5rem 0;
+      }
+      figure img {
+        width: 100%;
+        display: block;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      figcaption {
+        color: var(--dim);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.95rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.45rem 0.75rem 0.45rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--dim);
+        font-weight: 600;
+      }
+      pre {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.8rem 1rem;
+        overflow-x: auto;
+        font:
+          0.9rem/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      code {
+        font:
+          0.9em ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+        gap: 0 2rem;
+      }
+      .note {
+        color: var(--dim);
+        font-size: 0.9rem;
+      }
+      footer {
+        margin-top: 3rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--line);
+        color: var(--dim);
+        font-size: 0.9rem;
+      }
+      @media (max-width: 700px) {
+        .ribbon {
+          display: none;
+        }
+      }
+      @media (max-width: 640px) {
+        body {
+          padding: 1rem 0.75rem 2rem;
+        }
+        h1 {
+          font-size: 1.4rem;
+        }
+        header img {
+          width: 52px;
+          height: 52px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ribbon">
+      <a href="https://github.com/crgimenes/keikiban">Fork me on GitHub</a>
     </div>
-  </header>
+    <main>
+      <header>
+        <img src="favicon.png" alt="" />
+        <div>
+          <h1>keikiban</h1>
+          <p class="tagline">
+            A PostgreSQL dashboard that stays up when the database does not.
+          </p>
+        </div>
+      </header>
 
-  <p>When something is wrong at 3am, browsing a schema is not what I need. I
-  need to know which query is eating the server, who is blocking whom, and
-  whether that index nobody scanned in six months is worth its gigabyte.</p>
+      <p>
+        When something is wrong at 3am, browsing a schema is not what I need. I
+        need to know which query is eating the server, who is blocking whom, and
+        whether that index nobody scanned in six months is worth its gigabyte.
+      </p>
 
-  <p>keikiban is built for that moment first. It goes straight at the problem:
-  it has to stay usable while the database is busy, because that is the only
-  time I open it, and it attaches to one database at a time, so a command
-  cannot land on a server I was not looking at.</p>
+      <figure>
+        <img
+          src="dashboard-dark.png"
+          alt="keikiban dashboard: database load stacked by wait event, connections, transactions per second, buffer reads, and the blocking tree"
+        />
+        <figcaption>
+          Database load by wait event, the way RDS Performance Insights draws
+          it. Sampled once a second from <code>pg_stat_activity</code>: no agent
+          on the server, no extension required. Every number on this page was
+          measured against a <code>pgbench</code> workload and recorded with
+          <code>keikiban -json dashboard</code>; nothing here is drawn from
+          made-up data.
+        </figcaption>
+      </figure>
 
-  <figure>
-    <img src="dashboard-dark.png" alt="keikiban dashboard: database load stacked by wait event, connections, transactions per second, buffer reads, and the blocking tree">
-    <figcaption>Database load by wait event, the way RDS Performance Insights
-    draws it. Sampled once a second from <code>pg_stat_activity</code>: no
-    agent on the server, no extension required. Every number on this page was
-    measured against a <code>pgbench</code> workload and recorded with
-    <code>keikiban -json dashboard</code>; nothing here is drawn from made-up
-    data.</figcaption>
-  </figure>
+      <h2>What it shows</h2>
 
-  <h2>What it shows</h2>
+      <div class="cols">
+        <div>
+          <h3>Load and top SQL</h3>
+          <p>
+            Average active sessions stacked by wait event, sliced by SQL, user,
+            host, application or database. Each statement in the ranking is
+            broken down by what it waited on. With
+            <code>pg_stat_statements</code> the ranking also carries calls/s,
+            rows/call and ms/call.
+          </p>
 
-  <div class="cols">
-    <div>
-      <h3>Load and top SQL</h3>
-      <p>Average active sessions stacked by wait event, sliced by SQL, user,
-      host, application or database. Each statement in the ranking is broken
-      down by what it waited on. With <code>pg_stat_statements</code> the
-      ranking also carries calls/s, rows/call and ms/call.</p>
+          <h3>Blocking</h3>
+          <p>
+            Who holds the lock, who waits on it, the SQL on both sides, the lock
+            mode, and how long the wait has been going. Chains are detected, so
+            the middle link is labelled instead of being mistaken for the
+            culprit.
+          </p>
+        </div>
+        <div>
+          <h3>Index health</h3>
+          <p>
+            Unused, duplicate and invalid indexes, ordered by the space they
+            waste. Sequential-scan offenders and cache hit ratios. Primary keys
+            are never suggested for removal, and unique indexes carry a warning.
+          </p>
 
-      <h3>Blocking</h3>
-      <p>Who holds the lock, who waits on it, the SQL on both sides, the lock
-      mode, and how long the wait has been going. Chains are detected, so the
-      middle link is labelled instead of being mistaken for the culprit.</p>
-    </div>
-    <div>
-      <h3>Index health</h3>
-      <p>Unused, duplicate and invalid indexes, ordered by the space they
-      waste. Sequential-scan offenders and cache hit ratios. Primary keys are
-      never suggested for removal, and unique indexes carry a warning.</p>
+          <h3>Maintenance</h3>
+          <p>
+            Transaction ID wraparound, dead rows and when vacuum last ran, long
+            transactions holding vacuum back, and sequences approaching
+            overflow.
+          </p>
+        </div>
+      </div>
 
-      <h3>Maintenance</h3>
-      <p>Transaction ID wraparound, dead rows and when vacuum last ran, long
-      transactions holding vacuum back, and sequences approaching overflow.</p>
-    </div>
-  </div>
+      <figure>
+        <img
+          src="indexes-dark.png"
+          alt="Index health screen showing duplicate and unused indexes with their DDL and a drop button"
+        />
+        <figcaption>
+          Every destructive action shows the exact statement first, and lets you
+          copy it and run it somewhere else instead.
+        </figcaption>
+      </figure>
 
-  <figure>
-    <img src="indexes-dark.png" alt="Index health screen showing duplicate and unused indexes with their DDL and a drop button">
-    <figcaption>Every destructive action shows the exact statement first, and
-    lets you copy it and run it somewhere else instead.</figcaption>
-  </figure>
+      <h2>Install</h2>
 
-  <h2>Install</h2>
+      <p>
+        Requires PostgreSQL 12 or newer and a 64-bit machine. Nothing to install
+        on the server.
+      </p>
 
-  <p>Requires PostgreSQL 12 or newer and a 64-bit machine. Nothing to install
-  on the server.</p>
+      <pre>brew install crgimenes/tap/keikiban</pre>
 
-  <pre>brew install crgimenes/tap/keikiban</pre>
+      <p>
+        Or take a binary from the
+        <a href="https://github.com/crgimenes/keikiban/releases">releases</a>:
+      </p>
 
-  <p>Or take a binary from the
-  <a href="https://github.com/crgimenes/keikiban/releases">releases</a>:</p>
+      <table>
+        <tr>
+          <th>System</th>
+          <th>File</th>
+        </tr>
+        <tr>
+          <td>macOS (Intel and Apple Silicon)</td>
+          <td><code>keikiban-darwin-universal.zip</code></td>
+        </tr>
+        <tr>
+          <td>Windows x64 / arm64</td>
+          <td>
+            <code>keikiban-windows-amd64.exe</code>,
+            <code>keikiban-windows-arm64.exe</code>
+          </td>
+        </tr>
+        <tr>
+          <td>Linux x64 / arm64</td>
+          <td>
+            <code>keikiban-linux-amd64.gz</code>,
+            <code>keikiban-linux-arm64.gz</code>
+          </td>
+        </tr>
+      </table>
 
-  <table>
-    <tr><th>System</th><th>File</th></tr>
-    <tr><td>macOS (Intel and Apple Silicon)</td><td><code>keikiban-darwin-universal.zip</code></td></tr>
-    <tr><td>Windows x64 / arm64</td><td><code>keikiban-windows-amd64.exe</code>, <code>keikiban-windows-arm64.exe</code></td></tr>
-    <tr><td>Linux x64 / arm64</td><td><code>keikiban-linux-amd64.gz</code>, <code>keikiban-linux-arm64.gz</code></td></tr>
-  </table>
+      <p class="note">
+        The macOS build is signed and notarized. Windows SmartScreen may want
+        "More info" then "Run anyway".
+      </p>
 
-  <p class="note">The macOS build is signed and notarized. Windows SmartScreen
-  may want "More info" then "Run anyway".</p>
+      <h2>Configure</h2>
 
-  <h2>Configure</h2>
+      <p>
+        Connections live in a
+        <a href="https://github.com/crgimenes/filo">Filo</a> file at
+        <code>~/.config/keikiban/init.filo</code>. On first run the app asks for
+        a connection and writes the file.
+      </p>
 
-  <p>Connections live in a <a href="https://github.com/crgimenes/filo">Filo</a>
-  file at <code>~/.config/keikiban/init.filo</code>. On first run the app asks
-  for a connection and writes the file.</p>
-
-  <pre>; keikiban configuration
+      <pre>
+; keikiban configuration
 (database "postgres://user:pass@db.internal:5432/app" "Production")
 (database "postgres://user:pass@localhost:5432/app" "Local")</pre>
 
-  <p>One connection at a time: connecting to one closes the other. The name of
-  the attached database sits in the sidebar and in the window title, so a
-  command cannot land on a server you were not looking at.</p>
+      <p>
+        One connection at a time: connecting to one closes the other. The name
+        of the attached database sits in the sidebar and in the window title, so
+        a command cannot land on a server you were not looking at.
+      </p>
 
-  <h2>For agents</h2>
+      <h2>For agents</h2>
 
-  <p>The GUI is the product. The flags exist so an AI agent can drive it:</p>
+      <p>
+        The GUI is the product. The flags exist so an AI agent can drive it:
+      </p>
 
-  <pre>keikiban -json dashboard 30    sample the load for 30s, then report it
+      <pre>
+keikiban -json dashboard 30    sample the load for 30s, then report it
 keikiban -json sessions        current sessions
 keikiban -json locks           blocking tree
 keikiban -json indexes         index health report
 keikiban -json maintenance     vacuum, wraparound, sequences</pre>
 
-  <p>Each prints one JSON document to stdout and exits. Passwords are masked
-  everywhere, including in <code>-debug</code>.</p>
+      <p>
+        Each prints one JSON document to stdout and exits. Passwords are masked
+        everywhere, including in <code>-debug</code>.
+      </p>
 
-  <footer>
-    <p>MIT licensed. Source and issues on
-    <a href="https://github.com/crgimenes/keikiban">GitHub</a>.
-    Built in Go with <a href="https://github.com/crgimenes/glaze">glaze</a>,
-    no cgo.</p>
-  </footer>
-</main>
-</body>
+      <footer>
+        <p>
+          MIT licensed. Source and issues on
+          <a href="https://github.com/crgimenes/keikiban">GitHub</a>. Built in
+          Go with <a href="https://github.com/crgimenes/glaze">glaze</a>, no
+          cgo.
+        </p>
+      </footer>
+    </main>
+  </body>
 </html>
+
