@@ -3,7 +3,7 @@
 #
 # Reads the first connection URL from the keikiban config and runs a mix of
 # random queries (CPU burns, sleeps, sorts, catalog joins) until stopped, so
-# the dashboard has something to show without a human driving DBeaver.
+# the dashboard has something to show without a human typing queries by hand.
 #
 #   ./tools/loadgen.sh            run until Ctrl+C (or pkill -f loadgen.sh)
 #   ./tools/loadgen.sh 120        run for 120 seconds and exit

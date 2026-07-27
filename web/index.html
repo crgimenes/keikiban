@@ -128,10 +128,10 @@ footer {
   need to know which query is eating the server, who is blocking whom, and
   whether that index nobody scanned in six months is worth its gigabyte.</p>
 
-  <p>pgAdmin's dashboard falls over exactly when the database is busy, which
-  is the only time I open it. DBeaver keeps several connections live at once,
-  so the fastest way to run a command against production is to think you are
-  on staging. keikiban is my answer to both.</p>
+  <p>keikiban is built for that moment first. It goes straight at the problem:
+  it has to stay usable while the database is busy, because that is the only
+  time I open it, and it attaches to one database at a time, so a command
+  cannot land on a server I was not looking at.</p>
 
   <figure>
     <img src="dashboard-dark.png" alt="keikiban dashboard: database load stacked by wait event, connections, transactions per second, buffer reads, and the blocking tree">
@@ -189,7 +189,7 @@ footer {
   <table>
     <tr><th>System</th><th>File</th></tr>
     <tr><td>macOS (Intel and Apple Silicon)</td><td><code>keikiban-darwin-universal.zip</code></td></tr>
-    <tr><td>Windows x64</td><td><code>keikiban-windows-amd64.zip</code></td></tr>
+    <tr><td>Windows x64 / arm64</td><td><code>keikiban-windows-amd64.exe</code>, <code>keikiban-windows-arm64.exe</code></td></tr>
     <tr><td>Linux x64 / arm64</td><td><code>keikiban-linux-amd64.gz</code>, <code>keikiban-linux-arm64.gz</code></td></tr>
   </table>
 
@@ -214,7 +214,8 @@ footer {
 
   <p>The GUI is the product. The flags exist so an AI agent can drive it:</p>
 
-  <pre>keikiban -json sessions        current sessions
+  <pre>keikiban -json dashboard 30    sample the load for 30s, then report it
+keikiban -json sessions        current sessions
 keikiban -json locks           blocking tree
 keikiban -json indexes         index health report
 keikiban -json maintenance     vacuum, wraparound, sequences</pre>

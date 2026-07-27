@@ -8,15 +8,14 @@ Those are real numbers: a `pgbench` run against a scratch database, recorded
 with `keikiban -json dashboard` and rendered by the interface itself. No
 screenshot here is drawn from invented data.
 
-The tools I had were built for browsing schemas. When something is wrong at
-3am, browsing a schema is not what I need. I need to know which query is
-eating the server, who is blocking whom, and whether that index nobody
-scanned in six months is worth its gigabyte.
+When something is wrong at 3am, browsing a schema is not what I need. I need
+to know which query is eating the server, who is blocking whom, and whether
+that index nobody scanned in six months is worth its gigabyte.
 
-pgAdmin's dashboard falls over exactly when the database is busy, which is
-the only time I open it. DBeaver keeps several connections live at once, so
-the fastest way to run a command against production is to think you are on
-staging. keikiban is my answer to both.
+keikiban is built for that moment first. It goes straight at the problem: it
+has to stay usable while the database is busy, because that is the only time
+I open it, and it attaches to one database at a time, so a command cannot
+land on a server I was not looking at.
 
 ## What it shows
 
@@ -55,7 +54,7 @@ Or take a binary from the [releases](https://github.com/crgimenes/keikiban/relea
 | System | File |
 | --- | --- |
 | macOS (Intel and Apple Silicon) | `keikiban-darwin-universal.zip` |
-| Windows x64 | `keikiban-windows-amd64.zip` |
+| Windows x64 / arm64 | `keikiban-windows-amd64.exe`, `keikiban-windows-arm64.exe` |
 | Linux x64 / arm64 | `keikiban-linux-amd64.gz`, `keikiban-linux-arm64.gz` |
 
 The macOS build is signed and notarized, so it opens normally. If you build it
@@ -87,6 +86,7 @@ window title, so a command cannot land on a server you were not looking at.
 The GUI is the product. The flags exist so an AI agent can drive it:
 
     keikiban -json connections     configured connections
+    keikiban -json dashboard 30    sample the load for 30s, then report it
     keikiban -json sessions        current sessions
     keikiban -json locks           blocking tree
     keikiban -json indexes         index health report
