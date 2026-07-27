@@ -32,14 +32,24 @@ function shiftToNow(buckets) {
   return buckets.map((b) => ({ t: b.t + offset, v: b.v }));
 }
 
+// The connections screen is the one place the mock has to keep state: connect,
+// disconnect and promote say nothing unless the list answers back. A second
+// entry is what makes the promote and the "one open at a time" rule visible;
+// no captured screenshot shows this screen, so nothing published depends on it.
+const MOCK = {
+  active: 0,
+  connections: [
+    { title: "keikibench", url: "postgres://postgres:...@db.local:5432/keikibench" },
+    { title: "staging", url: "postgres://postgres:...@stage.local:5432/app" },
+  ],
+};
+
 window.configState = async () => ({
   path: "~/.config/keikiban/init.filo",
   exists: true,
   error: "",
-  active: 0,
-  connections: [
-    { title: "keikibench", url: "postgres://postgres:...@db.local:5432/keikibench" },
-  ],
+  active: MOCK.active,
+  connections: MOCK.connections,
 });
 
 window.dashboardState = async (_win, _slice, topBy) => {
@@ -58,7 +68,28 @@ window.sessionList = async () => recorded("sessions");
 window.indexReport = async () => recorded("indexes");
 window.maintenanceReport = async () => recorded("maintenance");
 
-window.connectTo = async () => window.configState();
+window.connectTo = async (i) => {
+  MOCK.active = i;
+  return window.configState();
+};
+
+window.disconnect = async () => {
+  MOCK.active = -1;
+  return window.configState();
+};
+
+// Same index bookkeeping the Go side does: the attached entry moves with the
+// list instead of being swapped for whoever lands on its old position.
+window.makeDefault = async (i) => {
+  const [conn] = MOCK.connections.splice(i, 1);
+  MOCK.connections.unshift(conn);
+  if (MOCK.active === i) {
+    MOCK.active = 0;
+  } else if (MOCK.active >= 0 && MOCK.active < i) {
+    MOCK.active += 1;
+  }
+  return window.configState();
+};
 window.logError = async (m) => console.error("ui_error:", m);
 window.testConnection = async () => ({ ok: true, version: "PostgreSQL 16.14" });
 window.connectionURL = async () => "postgres://postgres:secret@db.local:5432/keikibench";

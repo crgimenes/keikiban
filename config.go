@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/crgimenes/filo"
@@ -187,34 +188,38 @@ func deleteConnection(path string, index int) error {
 	return rewriteConnectionLine(path, index, "")
 }
 
+// makeDefaultConnection moves the index-th (database ...) form to where the
+// first one sits. The default connection is by definition the first declared,
+// so promoting one is a line move: the line travels whole, carrying its
+// indentation and any same-line comment, and nothing else in the file moves.
+func makeDefaultConnection(path string, index int) error {
+	lines, dbLines, err := readConnectionLines(path)
+	if err != nil {
+		return err
+	}
+	if index < 0 || index >= len(dbLines) {
+		return fmt.Errorf("connection %d does not exist", index)
+	}
+	if index == 0 {
+		return nil
+	}
+
+	// index > 0, so the source line is always below the destination and
+	// removing it cannot shift where the first one sits.
+	from, to := dbLines[index], dbLines[0]
+	line := lines[from]
+	lines = slices.Insert(slices.Delete(lines, from, from+1), to, line)
+	return writeConfigLines(path, lines)
+}
+
 // rewriteConnectionLine performs the surgical edit behind update/delete: it
-// locates the config lines that hold exactly one (database ...) form each and
-// replaces (or, with an empty form, removes) the index-th one. Everything else
-// in the file, comments and unrelated settings included, is preserved
-// verbatim. When the file declares connections in a shape this cannot edit
-// safely (multi-line or computed forms), it refuses with an error instead of
-// guessing; the user edits the file directly.
+// replaces (or, with an empty form, removes) the index-th (database ...) line.
+// Everything else in the file, comments and unrelated settings included, is
+// preserved verbatim.
 func rewriteConnectionLine(path string, index int, form string) error {
-	b, err := os.ReadFile(filepath.Clean(path))
+	lines, dbLines, err := readConnectionLines(path)
 	if err != nil {
-		return fmt.Errorf("read config %s: %w", path, err)
-	}
-
-	conns, err := parseConfig(string(b))
-	if err != nil {
-		return fmt.Errorf("parse config %s: %w", path, err)
-	}
-
-	lines := strings.Split(string(b), "\n")
-	var dbLines []int
-	for i, line := range lines {
-		if isDatabaseLine(line) {
-			dbLines = append(dbLines, i)
-		}
-	}
-
-	if len(dbLines) != len(conns) {
-		return fmt.Errorf("config %s declares connections in a shape keikiban cannot edit safely (multi-line or computed forms); edit the file directly", path)
+		return err
 	}
 	if index < 0 || index >= len(dbLines) {
 		return fmt.Errorf("connection %d does not exist", index)
@@ -222,7 +227,7 @@ func rewriteConnectionLine(path string, index int, form string) error {
 
 	n := dbLines[index]
 	if form == "" {
-		lines = append(lines[:n], lines[n+1:]...)
+		lines = slices.Delete(lines, n, n+1)
 	} else {
 		trimmed := strings.TrimLeft(lines[n], " \t")
 		indent := lines[n][:len(lines[n])-len(trimmed)]
@@ -230,8 +235,39 @@ func rewriteConnectionLine(path string, index int, form string) error {
 		suffix := trimmed[formEnd(trimmed):]
 		lines[n] = indent + form + suffix
 	}
+	return writeConfigLines(path, lines)
+}
 
-	err = os.WriteFile(filepath.Clean(path), []byte(strings.Join(lines, "\n")), 0o600) // #nosec G703 -- path comes from configPath (env/home), not untrusted input
+// readConnectionLines reads the config and reports which of its lines hold
+// exactly one complete (database ...) form each, in declaration order. When the
+// file states connections in a shape line surgery cannot edit safely
+// (multi-line or computed forms), it refuses with an error instead of guessing;
+// the user edits the file directly.
+func readConnectionLines(path string) (lines []string, dbLines []int, err error) {
+	b, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, nil, fmt.Errorf("read config %s: %w", path, err)
+	}
+
+	conns, err := parseConfig(string(b))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse config %s: %w", path, err)
+	}
+
+	lines = strings.Split(string(b), "\n")
+	for i, line := range lines {
+		if isDatabaseLine(line) {
+			dbLines = append(dbLines, i)
+		}
+	}
+	if len(dbLines) != len(conns) {
+		return nil, nil, fmt.Errorf("config %s declares connections in a shape keikiban cannot edit safely (multi-line or computed forms); edit the file directly", path)
+	}
+	return lines, dbLines, nil
+}
+
+func writeConfigLines(path string, lines []string) error {
+	err := os.WriteFile(filepath.Clean(path), []byte(strings.Join(lines, "\n")), 0o600) // #nosec G703 -- path comes from configPath (env/home), not untrusted input
 	if err != nil {
 		return fmt.Errorf("write config %s: %w", path, err)
 	}

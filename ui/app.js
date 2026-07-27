@@ -22,14 +22,19 @@ function applyZoom() {
 
 window.addEventListener("keydown", (ev) => {
   if (!(ev.metaKey || ev.ctrlKey) || ev.altKey) return;
-  if (ev.key === "+" || ev.key === "=") {
-    zoom = Math.min(zoom + 10, 200);
-  } else if (ev.key === "-") {
-    zoom = Math.max(zoom - 10, 60);
-  } else if (ev.key === "0") {
-    zoom = 100;
-  } else {
-    return;
+  switch (ev.key) {
+    case "+":
+    case "=":
+      zoom = Math.min(zoom + 10, 200);
+      break;
+    case "-":
+      zoom = Math.max(zoom - 10, 60);
+      break;
+    case "0":
+      zoom = 100;
+      break;
+    default:
+      return;
   }
   ev.preventDefault();
   localStorage.setItem(ZOOM_KEY, String(zoom));
@@ -181,7 +186,14 @@ function renderCell(conn, i) {
   edit.setAttribute("aria-label", "Edit");
 
   const row = buttonRow(edit);
-  if (i !== state.active) {
+  if (i !== 0) {
+    // "Default" is a position in the file, not a flag: promoting one moves its
+    // line to the top, which is where keikiban looks when it opens.
+    row.append(button("Make default", () => makeDefaultIndex(i)));
+  }
+  if (i === state.active) {
+    row.append(button("Disconnect", disconnectActive, "plug"));
+  } else {
     // Attaching here detaches from the current one: exactly one open server,
     // so a command can never land on the database you were not looking at.
     row.append(button("Connect", () => connectToIndex(i), "plug"));
@@ -190,11 +202,39 @@ function renderCell(conn, i) {
   return cell;
 }
 
+async function makeDefaultIndex(index) {
+  showListResult("");
+  try {
+    state = await window.makeDefault(index);
+  } catch (err) {
+    showListResult("Could not promote: " + err);
+    return;
+  }
+  render();
+}
+
+// Closing the connection is a resting state, not a failure: keikiban stays on
+// this screen attached to nothing until you pick a database again.
+async function disconnectActive() {
+  showListResult("");
+  try {
+    state = await window.disconnect();
+  } catch (err) {
+    showListResult("Could not disconnect: " + err);
+    return;
+  }
+  idxReport = null;
+  maint = null;
+  sessions = null;
+  render();
+}
+
 async function connectToIndex(index) {
+  showListResult("");
   try {
     state = await window.connectTo(index);
   } catch (err) {
-    showResult(String(err));
+    showListResult("Could not connect: " + err);
     return;
   }
   // Reports belong to the previous server; drop them so nothing stale is
@@ -230,13 +270,12 @@ function render() {
   const formOpen = screen === "connections" && editingIndex !== null;
 
   hideAll();
-  if (formOpen) {
-    el("setup").hidden = false;
-  } else if (screen === "connections") {
-    el("list").hidden = false;
-  } else {
-    el(screen).hidden = false;
-  }
+  // Every screen is its own section except connections, which has two faces:
+  // the list, and the add/edit form that takes over when one is open.
+  let section = screen;
+  if (screen === "connections") section = "list";
+  if (formOpen) section = "setup";
+  el(section).hidden = false;
 
   el("first-run-note").hidden = !unconfigured;
   el("cancel").hidden = unconfigured;
@@ -272,6 +311,12 @@ function render() {
 
 function showResult(text) {
   el("result").textContent = text;
+}
+
+// The list and the edit form are never on screen together, so a failure in the
+// list needs its own place to be seen; #result lives inside the form.
+function showListResult(text) {
+  el("list-result").textContent = text;
 }
 
 async function openForm(index) {

@@ -233,10 +233,18 @@ func runGUI(cfg Config, configErr string) {
 		return cfg.Connections[activeIndex], true
 	}
 
-	// activeURL is the shortcut every screen uses to reach the server.
-	activeURL := func() (string, bool) {
+	// activeDB is the shortcut every screen uses to reach the server. Having
+	// no connection at all and having deliberately closed the one you had are
+	// different situations, and the screen says which. Callers hold mu.
+	activeDB := func() (string, error) {
 		conn, ok := activeConn()
-		return conn.URL, ok
+		if ok {
+			return conn.URL, nil
+		}
+		if len(cfg.Connections) == 0 {
+			return "", errors.New("no connections configured")
+		}
+		return "", errors.New("not connected")
 	}
 
 	// ensureSampler keeps one sampler alive for the active connection and
@@ -321,12 +329,32 @@ func runGUI(cfg Config, configErr string) {
 		log.Fatal(err)
 	}
 
+	// disconnect closes the open connection and leaves keikiban attached to
+	// nothing: the sampler stops polling and the window title stops naming a
+	// server. Being attached to no database is a legitimate resting state, not
+	// an error to recover from.
+	err = w.Bind("disconnect", func() (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		activeIndex = -1
+		ensureSampler()
+		debugf("event=disconnected")
+		return state(), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = w.Bind("dashboardState", func(windowSeconds int, sliceBy, topBy string) (dashOut, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if sampler == nil {
+			status := "no connection configured"
+			if len(cfg.Connections) > 0 {
+				status = "not connected"
+			}
 			return dashOut{
-				Status:           "no connection configured",
+				Status:           status,
 				Classes:          []string{},
 				WaitClasses:      []string{},
 				Buckets:          []bucketOut{},
@@ -371,14 +399,13 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("indexReport", func() (indexReport, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
 			report := emptyIndexReport()
-			report.Error = "no connections configured"
+			report.Error = err.Error()
 			return report, nil
 		}
-		dbURL, _ := activeURL()
-		mu.Unlock()
 		return collectIndexReport(context.Background(), dbURL), nil
 	})
 	if err != nil {
@@ -389,12 +416,11 @@ func runGUI(cfg Config, configErr string) {
 	// statement the confirmation dialog displayed.
 	err = w.Bind("signalBackend", func(pid int, terminate bool) error {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
-			return fmt.Errorf("no connections configured")
-		}
-		dbURL, _ := activeURL()
+		dbURL, err := activeDB()
 		mu.Unlock()
+		if err != nil {
+			return err
+		}
 		return cancelBackend(context.Background(), dbURL, pid, terminate)
 	})
 	if err != nil {
@@ -403,15 +429,14 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("sessionList", func() (sessionsOut, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
 			return sessionsOut{
-				Error:    "no connections configured",
+				Error:    err.Error(),
 				Sessions: []sessionOut{},
 			}, nil
 		}
-		dbURL, _ := activeURL()
-		mu.Unlock()
 		return collectSessions(context.Background(), dbURL), nil
 	})
 	if err != nil {
@@ -420,14 +445,13 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("maintenanceReport", func() (maintenanceReport, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
 			report := emptyMaintenanceReport()
-			report.Error = "no connections configured"
+			report.Error = err.Error()
 			return report, nil
 		}
-		dbURL, _ := activeURL()
-		mu.Unlock()
 		return collectMaintenance(context.Background(), dbURL), nil
 	})
 	if err != nil {
@@ -436,12 +460,11 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("vacuumProgress", func() (vacuumProgressOut, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
 			return vacuumProgressOut{}, nil
 		}
-		dbURL, _ := activeURL()
-		mu.Unlock()
 		return collectVacuumProgress(context.Background(), dbURL), nil
 	})
 	if err != nil {
@@ -450,13 +473,12 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("vacuumTable", func(schema, table string) (maintenanceReport, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
-			return maintenanceReport{}, fmt.Errorf("no connections configured")
-		}
-		dbURL, _ := activeURL()
+		dbURL, err := activeDB()
 		mu.Unlock()
-		err := runVacuum(context.Background(), dbURL, schema, table)
+		if err != nil {
+			return maintenanceReport{}, err
+		}
+		err = runVacuum(context.Background(), dbURL, schema, table)
 		if err != nil {
 			return maintenanceReport{}, err
 		}
@@ -468,13 +490,12 @@ func runGUI(cfg Config, configErr string) {
 
 	err = w.Bind("dropIndex", func(schema, name string) (indexReport, error) {
 		mu.Lock()
-		if len(cfg.Connections) == 0 {
-			mu.Unlock()
-			return indexReport{}, fmt.Errorf("no connections configured")
-		}
-		dbURL, _ := activeURL()
+		dbURL, err := activeDB()
 		mu.Unlock()
-		err := dropIndex(context.Background(), dbURL, schema, name)
+		if err != nil {
+			return indexReport{}, err
+		}
+		err = dropIndex(context.Background(), dbURL, schema, name)
 		if err != nil {
 			return indexReport{}, err
 		}
@@ -550,7 +571,40 @@ func runGUI(cfg Config, configErr string) {
 		if err != nil {
 			return uiState{}, err
 		}
+		// The list closes up under the attached connection: follow it, so the
+		// entry keikiban is attached to is never silently swapped for its
+		// neighbour. Deleting the open one leaves keikiban attached to nothing.
+		switch {
+		case activeIndex == index:
+			activeIndex = -1
+		case activeIndex > index:
+			activeIndex--
+		}
 		debugf("event=connection_deleted index=%d", index)
+		return reload()
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// makeDefault promotes a connection to first in the file, which is what
+	// "default" means here: the one keikiban attaches to when it opens.
+	err = w.Bind("makeDefault", func(index int) (uiState, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		err := makeDefaultConnection(cfg.Path, index)
+		if err != nil {
+			return uiState{}, err
+		}
+		// Promoting reorders the list, so the attached index has to move with
+		// the entry it names; the open server must not change behind your back.
+		switch {
+		case activeIndex == index:
+			activeIndex = 0
+		case activeIndex >= 0 && activeIndex < index:
+			activeIndex++
+		}
+		debugf("event=connection_promoted index=%d", index)
 		return reload()
 	})
 	if err != nil {

@@ -843,7 +843,8 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topB
 			if topBy == "sql" && row.queryID != 0 {
 				id := row.queryID
 				topKey = "id:" + strconv.FormatInt(id, 10)
-				if _, seen := topDisplay[topKey]; !seen {
+				_, seen := topDisplay[topKey]
+				if !seen {
 					topDisplay[topKey] = row.query
 				}
 				queryIDOf[topKey] = id
@@ -922,7 +923,8 @@ func aggregate(samples []sample, now time.Time, windowSeconds int, sliceBy, topB
 	var top []topSQLOut
 	for q, n := range topCount {
 		label := q
-		if text, ok := topDisplay[q]; ok {
+		text, ok := topDisplay[q]
+		if ok {
 			label = text
 		}
 		entry := topSQLOut{Query: label, ByClass: map[string]float64{}, queryID: queryIDOf[q]}

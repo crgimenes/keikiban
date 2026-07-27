@@ -176,6 +176,70 @@ func TestUpdateAndDeleteConnection(t *testing.T) {
 	}
 }
 
+func TestMakeDefaultConnection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "init.filo")
+	src := `; keikiban configuration
+(database "postgres://a@h1/db1" "One")
+(set Unrelated 42)
+  (database "postgres://b@h2/db2" "Two") ; staging note
+(database "postgres://c@h3/db3" "Three")
+`
+	err := os.WriteFile(path, []byte(src), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = makeDefaultConnection(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conns, err := parseConfig(string(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Two", "One", "Three"}
+	for i, title := range want {
+		if conns[i].Title != title {
+			t.Errorf("connection %d = %q, want %q\n%s", i, conns[i].Title, title, b)
+		}
+	}
+	// The line travels whole: its indentation and same-line comment come along.
+	if !strings.Contains(string(b), `  (database "postgres://b@h2/db2" "Two") ; staging note`) {
+		t.Errorf("promoted line lost its indentation or comment:\n%s", b)
+	}
+	if !strings.Contains(string(b), "(set Unrelated 42)") {
+		t.Errorf("promotion touched an unrelated line:\n%s", b)
+	}
+	// The header comment stays on top; the promoted form goes where the first
+	// connection was, not above everything.
+	if !strings.HasPrefix(string(b), "; keikiban configuration\n  (database") {
+		t.Errorf("promotion did not land on the first connection's line:\n%s", b)
+	}
+
+	// Promoting the one that is already default is a no-op, not an error.
+	before := string(b)
+	err = makeDefaultConnection(path, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != before {
+		t.Errorf("promoting the default rewrote the file:\n%s", b)
+	}
+
+	err = makeDefaultConnection(path, 3)
+	if err == nil {
+		t.Error("promoting a connection that does not exist must fail")
+	}
+}
+
 func TestRewriteRefusesUneditableShapes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "init.filo")
 	// A multi-line form parses fine but cannot be edited line-surgically.
@@ -192,6 +256,10 @@ func TestRewriteRefusesUneditableShapes(t *testing.T) {
 	err = updateConnection(path, 0, "postgres://x@h/db", "")
 	if err == nil {
 		t.Fatal("update on a multi-line form must refuse, got nil error")
+	}
+	err = makeDefaultConnection(path, 0)
+	if err == nil {
+		t.Fatal("promotion on a multi-line form must refuse, got nil error")
 	}
 	// And the refusal must not have touched the file.
 	b, err := os.ReadFile(path)

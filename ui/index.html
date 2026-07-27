@@ -336,7 +336,7 @@
       justify-content: flex-end;
     }
     .hint { font-size: 0.85rem; opacity: 0.75; }
-    #result { white-space: pre-wrap; word-break: break-word; }
+    #result, #list-result { white-space: pre-wrap; word-break: break-word; }
     #config-error { white-space: pre-wrap; word-break: break-word; }
     .cell {
       border: 1px solid rgba(127, 127, 127, 0.35);
@@ -584,12 +584,13 @@
   <section id="list" hidden>
     <h2>Connections</h2>
     <div id="connections"></div>
+    <p id="list-result" aria-live="polite"></p>
     <div class="buttons">
       <button type="button" id="add">Add connection</button>
     </div>
-    <p class="hint">The first connection is the default: it will load the
-      dashboard when keikiban opens. Dashboard screens are under
-      construction.</p>
+    <p class="hint">The first connection is the default: keikiban attaches to
+      it when it opens. Only one connection is open at a time, so connecting
+      to another closes the current one.</p>
   </section>
 
   </main>
