@@ -1,0 +1,38 @@
+{
+  "objects": [
+    {
+      "schema": "public",
+      "name": "pgbench_accounts",
+      "kind": "r",
+      "sizeBytes": 78454784,
+      "size": "75 MB",
+      "comment": "pgbench: one row per account"
+    },
+    {
+      "schema": "public",
+      "name": "pgbench_branches",
+      "kind": "r",
+      "sizeBytes": 57344,
+      "size": "56 kB",
+      "comment": ""
+    },
+    {
+      "schema": "public",
+      "name": "pgbench_history",
+      "kind": "r",
+      "sizeBytes": 0,
+      "size": "0 bytes",
+      "comment": ""
+    },
+    {
+      "schema": "public",
+      "name": "pgbench_tellers",
+      "kind": "r",
+      "sizeBytes": 57344,
+      "size": "56 kB",
+      "comment": ""
+    }
+  ],
+  "total": 4,
+  "truncated": false
+}

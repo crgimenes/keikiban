@@ -1,0 +1,495 @@
+    /* Let the OS webview do the styling: native controls, native colors,
+       native dark mode. Only layout lives here. Everything is sized in rem
+       so the keyboard zoom (Cmd+/Cmd-) scales the whole page. */
+    :root { color-scheme: light dark; }
+    /* Shell: a fixed nav rail plus the scrolling screen. Global navigation
+       lives in the rail; each screen keeps its own controls in its header. */
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+    }
+    #sidebar {
+      flex: 0 0 auto;
+      width: 11rem;
+      padding: 0.75rem 0.5rem;
+      border-right: 1px solid rgba(127, 127, 127, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    /* The toggle sits at the top left, where a hamburger is expected. */
+    #nav-top {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    #brand {
+      font-weight: 700;
+      opacity: 0.85;
+      white-space: nowrap;
+    }
+    .nav-toggle { padding: 0.4rem; }
+    .nav-item {
+      font: inherit;
+      text-align: left;
+      background: none;
+      border: 0;
+      border-radius: 0.35rem;
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-item:hover { background: rgba(127, 127, 127, 0.18); }
+    .nav-item[aria-current="page"] {
+      background: rgba(127, 127, 127, 0.28);
+      font-weight: 600;
+    }
+    .nav-bottom { margin-top: auto; opacity: 0.7; }
+    /* The attached database is stated permanently: no screen, no keystroke
+       should ever leave a doubt about which server is on the other end. */
+    #attached {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.2rem 0.6rem 0.8rem;
+      font-size: 0.85rem;
+      overflow: hidden;
+    }
+    #attached-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #attached .dot {
+      width: 0.55em;
+      height: 0.55em;
+      border-radius: 50%;
+      background: light-dark(#2e7d32, #66bb6a);
+      flex-shrink: 0;
+    }
+    body.nav-collapsed #attached { justify-content: center; padding: 0.2rem 0 0.8rem; }
+    body.nav-collapsed #attached-name { display: none; }
+    /* Collapsed: icons only, labels hidden but still read by screen readers. */
+    body.nav-collapsed #sidebar { width: auto; }
+    body.nav-collapsed #brand { display: none; }
+    body.nav-collapsed .nav-item span { display: none; }
+    /* Collapsed by the window being narrow, not by the user: the toggle is
+       disabled rather than lying about a choice it cannot honour. */
+    body.nav-forced-collapsed .nav-toggle { opacity: 0.4; cursor: default; }
+    #content {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 1.25rem;
+    }
+    h1 { font-size: 1.3rem; margin-top: 0; }
+    h2 { font-size: 1.05rem; }
+    label { display: block; margin-top: 0.8rem; }
+    input[type="text"] {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 0.25rem;
+      font-size: 1rem;
+    }
+    button {
+      font: inherit;
+      padding: 0.3rem 1.1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    svg.icon { width: 1em; height: 1em; flex-shrink: 0; }
+    /* Destructive actions read red in both themes; the icon follows via
+       currentColor. */
+    button.destructive { color: light-dark(#b3261e, #ff7369); }
+    /* Delete lives apart from the safe actions in the same row. */
+    #delete { margin-right: auto; }
+    button.icon-only { padding: 0.3rem 0.55rem; }
+
+    /* Dashboard */
+    .dash-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .dash-header h2 { margin: 0; }
+    .dash-actions { margin-top: 0; margin-left: auto; }
+    .windows { display: inline-flex; gap: 0.2rem; }
+    .slice-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0;
+      font-size: 0.9rem;
+    }
+    .slice-label select { font: inherit; }
+    /* A slice key can be a whole SQL statement; keep the legend a column. */
+    .legend-item {
+      max-width: 16rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .win[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
+    /* Chart with the legend to its right, Performance Insights style; on a
+       narrow window the legend wraps below. */
+    #chart-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    #chart-box { position: relative; flex: 1 1 24rem; }
+    #chart { width: 100%; height: 300px; display: block; }
+    /* The dashboard grows downward like a web page; counter charts sit side
+       by side while they fit, then stack. */
+    #counters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+    .counter-panel h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+    .counter-panel canvas { width: 100%; height: 170px; display: block; }
+    .mini-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem 1rem;
+      margin-top: 0.35rem;
+      font-size: 0.8rem;
+    }
+    #chart-tip {
+      position: absolute;
+      pointer-events: none;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid rgba(127, 127, 127, 0.5);
+      border-radius: 0.3rem;
+      background: Canvas;
+      box-shadow: 0 0.15rem 0.6rem rgba(0, 0, 0, 0.25);
+      font-size: 0.8rem;
+      z-index: 1;
+      white-space: nowrap;
+    }
+    #chart-tip .legend-swatch { margin-right: 0.3em; }
+    #ext-badge {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      color: light-dark(#b58900, #ffd54f);
+    }
+    #ext-tip {
+      position: absolute;
+      top: 2.4rem;
+      right: 0.4rem;
+      max-width: 34rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid rgba(127, 127, 127, 0.5);
+      border-radius: 0.4rem;
+      background: Canvas;
+      box-shadow: 0 0.2rem 1rem rgba(0, 0, 0, 0.25);
+      z-index: 1;
+    }
+    #ext-tip pre {
+      overflow-x: auto;
+      font-size: 0.85rem;
+      padding: 0.5rem;
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 0.3rem;
+    }
+    #legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      min-width: 7rem;
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.35em; }
+    .legend-swatch {
+      width: 0.75em;
+      height: 0.75em;
+      border-radius: 0.15em;
+      display: inline-block;
+    }
+    .sql-load { font-variant-numeric: tabular-nums; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .tab[aria-pressed="true"] { font-weight: 700; text-decoration: underline; }
+    /* Fixed height: the ranking changes every refresh, and a list that grows
+       and shrinks makes the whole page jump under the reader. */
+    #topsql {
+      height: 26rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    /* Only the SQL tab shows statements; other dimensions are short labels. */
+    .top-label { font-weight: 600; margin-top: 0.3rem; }
+    .sql-text {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.3rem;
+    }
+    /* Per-query load bar, stacked by wait class in the chart colors. */
+    .sql-bar {
+      display: flex;
+      height: 0.45rem;
+      border-radius: 0.2rem;
+      overflow: hidden;
+      margin-top: 0.35rem;
+      background: rgba(127, 127, 127, 0.15);
+    }
+    .sql-bar span { height: 100%; }
+
+    /* Progress of a long action */
+    .progress-track {
+      height: 0.5rem;
+      border-radius: 0.25rem;
+      background: rgba(127, 127, 127, 0.25);
+      overflow: hidden;
+      margin-top: 0.4rem;
+    }
+    .progress-fill {
+      height: 100%;
+      background: light-dark(#1e88e5, #64b5f6);
+      transition: width 0.4s linear;
+    }
+    /* Before the server reports a percentage, the bar animates to show the
+       action is alive rather than pretending to know how far it got. */
+    .progress-fill.indeterminate {
+      width: 30%;
+      animation: slide 1.4s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0% { margin-left: 0; }
+      50% { margin-left: 70%; }
+      100% { margin-left: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .progress-fill.indeterminate { animation: none; width: 100%; opacity: 0.5; }
+    }
+    button[disabled] { opacity: 0.5; }
+
+    /* Blocking tree */
+    .blocked-item {
+      margin-top: 0.5rem;
+      padding-left: 0.8rem;
+      border-left: 3px solid light-dark(#b3261e, #ff7369);
+    }
+    .chain-note { font-size: 0.85rem; }
+
+    /* Index health */
+    #indexes h3 { margin-bottom: 0.2rem; }
+    #indexes h3 + .hint { margin-top: 0; }
+    .idx-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      opacity: 0.85;
+    }
+    .warn-text { color: light-dark(#b58900, #ffd54f); }
+    table.scans {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.9rem;
+    }
+    table.scans th, table.scans td {
+      text-align: left;
+      padding: 0.3rem 0.8rem 0.3rem 0;
+      border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+    }
+    table.scans td.num, table.scans th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Object browser. Selecting an object opens its own window, so this screen
+       is only the tree, and the tree gets the whole height: a fixed max-height
+       left dead space below it and made the window look unresponsive. The
+       section is a flex column pinned to the viewport, with the tree as the
+       one part that scrolls. */
+    #browser {
+      display: flex;
+      flex-direction: column;
+      /* #content's own vertical padding is the only thing between this and
+         the window edge. */
+      height: calc(100vh - 2.5rem);
+    }
+    #br-search { width: 100%; box-sizing: border-box; flex: none; }
+    #br-tree {
+      margin-top: 0.6rem;
+      flex: 1 1 auto;
+      /* Without this a flex item refuses to shrink below its content, and the
+         scrollbar never appears. */
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+    .br-node {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: 0;
+      padding: 0.2rem 0.3rem;
+      border-radius: 0.3rem;
+      font: inherit;
+      color: inherit;
+      cursor: default;
+    }
+    .br-node:hover { background: rgba(127, 127, 127, 0.15); }
+    .br-node[aria-current="true"] { background: rgba(127, 127, 127, 0.28); }
+    .br-schema { font-weight: 600; }
+    .br-group { padding-left: 1.2rem; }
+    .br-leaf { padding-left: 2.4rem; }
+    .br-hit { padding-left: 0.3rem; }
+    /* The twisty is a fixed-width column so labels line up whatever it shows. */
+    .br-twisty {
+      width: 1rem;
+      flex: none;
+      opacity: 0.7;
+      font-size: 0.75rem;
+    }
+    .br-count {
+      margin-left: auto;
+      font-size: 0.8rem;
+      opacity: 0.7;
+      font-variant-numeric: tabular-nums;
+    }
+    .br-kind {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    /* Object window: one native window per database object, so several tables
+       can stay open side by side with their own tabs. It has no nav rail —
+       the window IS the object. */
+    body.object-window { display: block; }
+    #obj-shell {
+      padding: 1.25rem;
+      /* The window is the object, so its content grows with it: the data tab
+         needs a real height to split between editor and grid. */
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    #obj-props { overflow: auto; }
+
+    /* The SQL editor: statement on top, rows underneath. One editor serves
+       every place that shows data, and the statement is never hidden. */
+    #obj-data {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+    #sql-editor { flex: none; }
+    #sql-text {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: ui-monospace, monospace;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+    #sql-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 0.4rem;
+    }
+    #sql-bar .buttons { margin-top: 0; margin-left: auto; }
+    #sql-result {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      margin-top: 0.8rem;
+    }
+    /* A NULL is not an empty string, and the grid must never let the two look
+       alike. */
+    .cell-null { opacity: 0.55; font-style: italic; }
+    table.grid {
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
+    }
+    table.grid th, table.grid td {
+      text-align: left;
+      padding: 0.25rem 0.8rem 0.25rem 0.3rem;
+      border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+      white-space: pre;
+      max-width: 28rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    table.grid thead th {
+      position: sticky;
+      top: 0;
+      background: Canvas;
+    }
+    .grid-type { font-weight: normal; opacity: 0.6; font-size: 0.75rem; }
+    /* Visually hidden but still announced. */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    #obj-props h3 { margin-bottom: 0.2rem; }
+    #obj-props h3 + .hint { margin-top: 0; }
+    .br-title { font-weight: 600; font-size: 1.05rem; }
+    .br-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      opacity: 0.85;
+      margin-top: 0.2rem;
+    }
+    .br-empty { opacity: 0.75; font-size: 0.9rem; }
+
+    /* Buttons anchor to the right edge and follow it on resize. */
+    .buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+    .hint { font-size: 0.85rem; opacity: 0.75; }
+    #result, #list-result { white-space: pre-wrap; word-break: break-word; }
+    #config-error { white-space: pre-wrap; word-break: break-word; }
+    .cell {
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 0.4rem;
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 0.6rem;
+    }
+    .cell .buttons { margin-top: 0.5rem; }
+    .conn-title { font-weight: 600; }
+    .conn-default {
+      font-weight: normal;
+      font-size: 0.8rem;
+      opacity: 0.75;
+      margin-left: 0.5rem;
+    }
+    [hidden] { display: none !important; }

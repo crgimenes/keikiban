@@ -43,35 +43,6 @@ window.addEventListener("keydown", (ev) => {
 
 applyZoom();
 
-// Icons from Bootstrap Icons (https://icons.getbootstrap.com), MIT, © The
-// Bootstrap Authors. Only the handful we use, inlined; fill follows the text
-// color, so both themes are covered.
-const ICONS = {
-  "plus-lg": '<path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>',
-  pencil: '<path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>',
-  trash: '<path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>',
-  plug: '<path d="M6 0a.5.5 0 0 1 .5.5V3h3V.5a.5.5 0 0 1 1 0V3h1a.5.5 0 0 1 .5.5v3A3.5 3.5 0 0 1 8.5 10c-.002.434-.01.845-.04 1.22-.041.514-.126 1.003-.317 1.424a2.08 2.08 0 0 1-.97 1.028C6.725 13.9 6.169 14 5.5 14c-.998 0-1.61.33-1.974.718A1.92 1.92 0 0 0 3 16H2c0-.616.232-1.367.797-1.968C3.374 13.42 4.261 13 5.5 13c.581 0 .962-.088 1.218-.219.241-.123.4-.3.514-.55.121-.266.193-.621.23-1.09.027-.34.035-.718.037-1.141A3.5 3.5 0 0 1 4 6.5v-3a.5.5 0 0 1 .5-.5h1V.5A.5.5 0 0 1 6 0M5 4v2.5A2.5 2.5 0 0 0 7.5 9h1A2.5 2.5 0 0 0 11 6.5V4z"/>',
-  gear: '<path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>',
-  "arrow-left": '<path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>',
-  warn: '<path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>',
-  "pause-fill": '<path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>',
-  speedometer: '<path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.39.39 0 0 0-.527-.02L7.547 9.31a.91.91 0 1 0 1.302 1.258l3.434-4.297a.39.39 0 0 0-.029-.518z"/><path fill-rule="evenodd" d="M0 10a8 8 0 1 1 15.547 2.661c-.442 1.253-1.845 1.602-2.932 1.25C11.309 13.488 9.475 13 8 13c-1.474 0-3.31.488-4.615.911-1.087.352-2.49.003-2.932-1.25A8 8 0 0 1 0 10m8-7a7 7 0 0 0-6.603 9.329c.203.575.923.876 1.68.63C4.397 12.533 6.358 12 8 12s3.604.532 4.923.96c.757.245 1.477-.056 1.68-.631A7 7 0 0 0 8 3"/>',
-  activity: '<path fill-rule="evenodd" d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.208A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.15l-1.88 5.17a.5.5 0 0 1-.94 0L6 3.964 4.47 8.171A.5.5 0 0 1 4 8.5H.5a.5.5 0 0 1 0-1h3.15l1.88-5.17A.5.5 0 0 1 6 2"/>',
-  diagram: '<path fill-rule="evenodd" d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zM8.5 5a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5zM0 11.5A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm4.5.5a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/>',
-  wrench: '<path d="M16 4.5a4.5 4.5 0 0 1-1.703 3.526L13 5l2.959-1.11q.04.3.041.61"/><path d="M11.5 9c.653 0 1.273-.139 1.833-.39L12 5.5 11 3l3.826-1.53A4.5 4.5 0 0 0 7.29 6.092l-6.116 5.096a2.583 2.583 0 1 0 3.638 3.638L9.908 8.71A4.5 4.5 0 0 0 11.5 9m-1.292-4.361-.596.893.809-.27a.25.25 0 0 1 .287.377l-.596.893.809-.27.158.475-1.5.5a.25.25 0 0 1-.287-.376l.596-.893-.809.27a.25.25 0 0 1-.287-.377l.596-.893-.809.27-.158-.475 1.5-.5a.25.25 0 0 1 .287.376M3 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>',
-  list: '<path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>',
-  "play-fill": '<path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>',
-};
-
-function icon(name) {
-  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  s.setAttribute("viewBox", "0 0 16 16");
-  s.setAttribute("fill", "currentColor");
-  s.setAttribute("aria-hidden", "true");
-  s.classList.add("icon");
-  s.innerHTML = ICONS[name];
-  return s;
-}
 
 let state = { path: "", exists: false, error: "", connections: [] };
 // editingIndex: null = form closed, -1 = adding, >= 0 = editing that entry.
@@ -80,12 +51,14 @@ let editingIndex = null;
 
 // One screen at a time, chosen in the sidebar. The dashboard is home.
 const SCREEN_KEY = "keikiban.screen";
-const SCREENS = ["dashboard", "sessions", "indexes", "maintenance", "connections"];
+const SCREENS = ["dashboard", "browser", "sessions", "indexes", "maintenance",
+  "connections"];
 let screen = localStorage.getItem(SCREEN_KEY) || "dashboard";
 if (!SCREENS.includes(screen)) screen = "dashboard";
 
 const NAV_ICONS = {
   dashboard: "speedometer",
+  browser: "table",
   sessions: "activity",
   indexes: "diagram",
   maintenance: "wrench",
@@ -101,6 +74,7 @@ function loadScreen(name) {
   if (name === "sessions") loadSessions();
   if (name === "indexes") loadIndexes();
   if (name === "maintenance") loadMaintenance();
+  if (name === "browser") loadBrowser();
 }
 
 function goTo(name) {
@@ -247,7 +221,7 @@ async function connectToIndex(index) {
 
 function render() {
   const sections = ["setup", "list", "dashboard", "sessions", "indexes",
-    "maintenance"];
+    "maintenance", "browser"];
   const hideAll = () => sections.forEach((id) => { el(id).hidden = true; });
 
   el("config-error-box").hidden = !state.error;
@@ -1087,6 +1061,246 @@ function renderSeqScans(tables) {
   box.append(table);
 }
 
+/* Object browser ---------------------------------------------------------
+   The tree is deliberately shallow (schema > group > object) and its search
+   runs on the server: DBeaver's navigator is the counter-example on both
+   counts, where the filter only ever finds what is already expanded. */
+
+const BR_GROUPS = [
+  { key: "tables", label: "Tables", count: "tables" },
+  { key: "views", label: "Views", count: "views" },
+  { key: "matviews", label: "Materialized views", count: "matViews" },
+  { key: "sequences", label: "Sequences", count: "sequences" },
+];
+
+const KIND_LABELS = {
+  r: "table",
+  p: "partitioned table",
+  v: "view",
+  m: "materialized view",
+  S: "sequence",
+};
+
+const BR_OPEN_KEY = "keikiban.browserOpen";
+
+let brTree = null;
+// Group nodes whose children are on screen. Persisted so that reopening the
+// app lands where the work was, which DBeaver users keep asking for.
+let brOpen = new Set(JSON.parse(localStorage.getItem(BR_OPEN_KEY) || "[]"));
+// Loaded children, keyed "schema/group"; a group is fetched once per visit.
+const brChildren = new Map();
+let brSelected = null;
+let brSearch = null;
+let brSearchTimer = 0;
+
+function brSaveOpen() {
+  localStorage.setItem(BR_OPEN_KEY, JSON.stringify([...brOpen]));
+}
+
+async function loadBrowser() {
+  el("br-status").textContent = "Reading the catalog...";
+  try {
+    brTree = await window.browserTree();
+  } catch (err) {
+    el("br-status").textContent = String(err);
+    return;
+  }
+  el("br-status").textContent = brTree.error || "";
+
+  // A database with a single schema has nothing to choose: open it rather
+  // than making the first click a formality.
+  if (brTree.schemas.length === 1 && brOpen.size === 0) {
+    brOpen.add(brTree.schemas[0].name);
+    brSaveOpen();
+  }
+  // Reopening restores the tree, so the groups that were open need their
+  // children back before anything can be drawn.
+  await Promise.all([...brOpen]
+    .filter((key) => key.includes("/"))
+    .map((key) => brFetchGroup(key)));
+  renderBrowser();
+}
+
+async function brFetchGroup(key) {
+  const [schema, group] = key.split("/");
+  try {
+    brChildren.set(key, await window.browserObjects(schema, group));
+  } catch (err) {
+    brChildren.set(key, { error: String(err), objects: [] });
+  }
+}
+
+async function brToggle(key) {
+  if (brOpen.has(key)) {
+    brOpen.delete(key);
+    brSaveOpen();
+    renderBrowser();
+    return;
+  }
+  brOpen.add(key);
+  brSaveOpen();
+  if (key.includes("/") && !brChildren.has(key)) await brFetchGroup(key);
+  renderBrowser();
+}
+
+// brSelect opens the object in its own native window. Keeping the properties
+// out of this screen is what lets several objects stay open at once, each with
+// its own tabs; the tree keeps the selection only to show where you last went.
+async function brSelect(schema, name) {
+  brSelected = schema + "." + name;
+  renderBrowser();
+  try {
+    await window.openObject(schema, name);
+  } catch (err) {
+    el("br-status").textContent = String(err);
+  }
+}
+
+// brRunSearch asks the server, so a match is found whether or not its branch
+// was ever opened. Debounced: one query per pause, not per keystroke.
+function brQueueSearch(term) {
+  clearTimeout(brSearchTimer);
+  if (!term.trim()) {
+    brSearch = null;
+    renderBrowser();
+    return;
+  }
+  brSearchTimer = setTimeout(async () => {
+    try {
+      brSearch = await window.browserSearch(term);
+    } catch (err) {
+      brSearch = { error: String(err), hits: [] };
+    }
+    renderBrowser();
+  }, 250);
+}
+
+function brNode(className, label, opts = {}) {
+  const node = document.createElement("button");
+  node.type = "button";
+  node.className = "br-node " + className;
+
+  // The glyph is decoration: left readable it lands in the accessible name as
+  // "black down-pointing triangle", and aria-expanded already says the state.
+  const twisty = document.createElement("span");
+  twisty.className = "br-twisty";
+  twisty.textContent = opts.twisty || "";
+  twisty.setAttribute("aria-hidden", "true");
+  node.append(twisty);
+  if (opts.twisty) node.setAttribute("aria-expanded", String(opts.open));
+
+  const text = document.createElement("span");
+  text.textContent = label;
+  node.append(text);
+
+  if (opts.kind) {
+    const kind = document.createElement("span");
+    kind.className = "br-kind";
+    kind.textContent = opts.kind;
+    node.append(kind);
+    node.setAttribute("aria-label", label + ", " + opts.kind);
+  }
+  if (opts.count !== undefined) {
+    const count = document.createElement("span");
+    count.className = "br-count";
+    count.textContent = opts.count;
+    node.append(count);
+    // Concatenated text would read as "Tables4"; spell the pair out instead.
+    node.setAttribute("aria-label", label + ", " + opts.count);
+  }
+  if (opts.current) node.setAttribute("aria-current", "true");
+  if (opts.onClick) node.addEventListener("click", opts.onClick);
+  return node;
+}
+
+function renderBrowser() {
+  const tree = el("br-tree");
+  tree.replaceChildren();
+
+  if (brSearch) {
+    renderBrowserSearch(tree);
+  } else {
+    el("br-search-note").hidden = true;
+    renderBrowserTree(tree);
+  }
+}
+
+function renderBrowserSearch(tree) {
+  const note = el("br-search-note");
+  note.hidden = false;
+  if (brSearch.error) {
+    note.textContent = brSearch.error;
+    return;
+  }
+  note.textContent = brSearch.truncated
+    ? "Showing " + brSearch.hits.length + " of " + brSearch.total + " matches."
+    : brSearch.total + (brSearch.total === 1 ? " match" : " matches");
+
+  for (const h of brSearch.hits) {
+    tree.append(brNode("br-hit", h.schema + "." + h.name, {
+      kind: KIND_LABELS[h.kind] || h.kind,
+      current: brSelected === h.schema + "." + h.name,
+      onClick: () => brSelect(h.schema, h.name),
+    }));
+  }
+}
+
+function renderBrowserTree(tree) {
+  if (!brTree) return;
+  if (brTree.schemas.length === 0 && !brTree.error) {
+    const note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = "No schemas visible to this user.";
+    tree.append(note);
+    return;
+  }
+
+  for (const s of brTree.schemas) {
+    const openSchema = brOpen.has(s.name);
+    tree.append(brNode("br-schema", s.name, {
+      twisty: openSchema ? "▼" : "▶",
+      open: openSchema,
+      onClick: () => brToggle(s.name),
+    }));
+    if (!openSchema) continue;
+
+    for (const g of BR_GROUPS) {
+      const key = s.name + "/" + g.key;
+      const openGroup = brOpen.has(key);
+      tree.append(brNode("br-group", g.label, {
+        twisty: openGroup ? "▼" : "▶",
+        open: openGroup,
+        count: String(s[g.count]),
+        onClick: () => brToggle(key),
+      }));
+      if (!openGroup) continue;
+
+      const list = brChildren.get(key);
+      if (!list) continue;
+      if (list.error) {
+        const err = document.createElement("p");
+        err.className = "hint br-leaf";
+        err.textContent = list.error;
+        tree.append(err);
+        continue;
+      }
+      for (const o of list.objects) {
+        tree.append(brNode("br-leaf", o.name, {
+          current: brSelected === o.schema + "." + o.name,
+          onClick: () => brSelect(o.schema, o.name),
+        }));
+      }
+      if (list.truncated) {
+        const more = document.createElement("p");
+        more.className = "hint br-leaf";
+        more.textContent = "Showing " + list.objects.length + " of " +
+          list.total + ". Use the search box to reach the rest.";
+        tree.append(more);
+      }
+    }
+  }
+}
+
 // busyBar shows an indeterminate bar for an action whose duration the server
 // does not report. It has no percentage on purpose: an invented one lies.
 function busyBar(id, label) {
@@ -1132,6 +1346,14 @@ async function runDropIndex(e) {
 }
 
 el("idx-refresh").addEventListener("click", loadIndexes);
+
+// Refresh drops the cached children too: a stale tree that never updates is
+// one of the standing complaints about the tools this replaces.
+el("br-refresh").addEventListener("click", () => {
+  brChildren.clear();
+  loadBrowser();
+});
+el("br-search").addEventListener("input", (e) => brQueueSearch(e.target.value));
 
 // --- Maintenance screen ---
 
@@ -1749,6 +1971,11 @@ async function runSessionSignal(s, terminate) {
 el("sess-refresh").addEventListener("click", loadSessions);
 el("sess-active-only").addEventListener("change", renderSessions);
 
+// Every screen's Refresh button carries the same icon, so the action reads the
+// same wherever it appears.
+for (const id of ["br-refresh", "idx-refresh", "maint-refresh", "sess-refresh"]) {
+  el(id).prepend(icon("arrow-clockwise"));
+}
 el("test").prepend(icon("plug"));
 el("add").prepend(icon("plus-lg"));
 el("delete").prepend(icon("trash"));

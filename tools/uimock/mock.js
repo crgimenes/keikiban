@@ -68,6 +68,65 @@ window.sessionList = async () => recorded("sessions");
 window.indexReport = async () => recorded("indexes");
 window.maintenanceReport = async () => recorded("maintenance");
 
+// The browser is recorded per node, since its queries take arguments. A group
+// with no capture answers empty rather than inventing objects.
+window.browserTree = async () => recorded("schemas");
+
+window.browserObjects = async (schema, group) => {
+  try {
+    return await recorded("objects-" + schema + "-" + group);
+  } catch {
+    return { objects: [], total: 0, truncated: false };
+  }
+};
+
+// In the app, opening an object creates a native window and the Go side
+// captures which object it is. A browser cannot do that, so the mock opens a
+// tab and carries the object in the URL; object.js never sees the difference,
+// because it only ever calls objectDetail().
+window.openObject = async (schema, name) => {
+  const q = new URLSearchParams({ schema, name });
+  window.open("object.html?" + q, "_blank");
+};
+
+// The editor opens with a real statement even here, so the layout can be
+// worked on offline. Running it cannot work: the mock has no server, and
+// saying so plainly beats inventing rows that were never measured.
+window.initialQuery = async () => {
+  const schema = PARAMS.get("schema") || "public";
+  const name = PARAMS.get("name") || "table";
+  return 'SELECT *\nFROM "' + schema + '"."' + name + '"\nLIMIT 100\nOFFSET 0;';
+};
+
+window.runQuery = async (sql) => ({
+  sql,
+  error: "the mocked UI has no database behind it; run the app to execute SQL",
+  columns: [],
+  rows: [],
+});
+
+window.cancelQuery = async () => {};
+
+window.objectDetail = async () => {
+  const schema = PARAMS.get("schema");
+  const name = PARAMS.get("name");
+  try {
+    return await recorded("describe-" + schema + "-" + name);
+  } catch {
+    return { schema, name, error: "no capture for " + schema + "." + name };
+  }
+};
+
+// Filtering the recorded names is what the server does anyway; no name here
+// is invented, and the escaping rule is exercised for real in the Go tests.
+window.browserSearch = async (term) => {
+  const list = await window.browserObjects("public", "tables");
+  const hits = list.objects
+    .filter((o) => o.name.includes(term))
+    .map((o) => ({ schema: o.schema, name: o.name, kind: o.kind }));
+  return { hits, total: hits.length, truncated: false };
+};
+
 window.connectTo = async (i) => {
   MOCK.active = i;
   return window.configState();

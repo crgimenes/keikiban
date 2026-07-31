@@ -292,6 +292,32 @@ func TestAggregateEmpty(t *testing.T) {
 	}
 }
 
+// TestRound2 pins the rounding of negative values. The first implementation
+// truncated towards zero, so the -1 that means "never vacuumed" reached the
+// JSON output as -0.99 and no longer matched the documented sentinel.
+func TestRound2(t *testing.T) {
+	cases := []struct {
+		in   float64
+		want float64
+	}{
+		{-1, -1},
+		{-0.994, -0.99},
+		{0, 0},
+		{1.004, 1.0},
+		{12.3456, 12.35},
+		// Exact binary halves, so the case really pins "away from zero" and
+		// not the representation error of a decimal literal.
+		{0.125, 0.13},
+		{-0.125, -0.13},
+	}
+	for _, c := range cases {
+		got := round2(c.in)
+		if got != c.want {
+			t.Errorf("round2(%v) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
 func TestNormalizeQuery(t *testing.T) {
 	long := make([]rune, 0, 400)
 	for range 400 {

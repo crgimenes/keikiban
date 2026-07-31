@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -1034,6 +1035,9 @@ func normalizeQuery(q string) string {
 	return q
 }
 
+// round2 trims a value to two decimals for display. It rounds half away from
+// zero: the old float64(int(f*100+0.5)) truncated towards zero instead, which
+// turned the -1 "never happened" sentinel of VacuumAgo/AnalyzeAgo into -0.99.
 func round2(f float64) float64 {
-	return float64(int(f*100+0.5)) / 100
+	return math.Round(f*100) / 100
 }

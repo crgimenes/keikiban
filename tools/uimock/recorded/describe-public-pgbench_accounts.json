@@ -1,0 +1,59 @@
+{
+  "schema": "public",
+  "name": "pgbench_accounts",
+  "kind": "r",
+  "size": "75 MB",
+  "rowEstimate": 500000,
+  "comment": "pgbench: one row per account",
+  "columns": [
+    {
+      "name": "aid",
+      "type": "integer",
+      "notNull": true,
+      "default": "",
+      "pk": true,
+      "fk": "",
+      "comment": ""
+    },
+    {
+      "name": "bid",
+      "type": "integer",
+      "notNull": false,
+      "default": "",
+      "pk": false,
+      "fk": "",
+      "comment": ""
+    },
+    {
+      "name": "abalance",
+      "type": "integer",
+      "notNull": false,
+      "default": "",
+      "pk": false,
+      "fk": "",
+      "comment": ""
+    },
+    {
+      "name": "filler",
+      "type": "character(84)",
+      "notNull": false,
+      "default": "",
+      "pk": false,
+      "fk": "",
+      "comment": ""
+    }
+  ],
+  "constraints": [
+    {
+      "name": "pgbench_accounts_pkey",
+      "def": "PRIMARY KEY (aid)"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "pgbench_accounts_pkey",
+      "def": "CREATE UNIQUE INDEX pgbench_accounts_pkey ON public.pgbench_accounts USING btree (aid)"
+    }
+  ],
+  "viewDef": ""
+}

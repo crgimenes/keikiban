@@ -171,11 +171,67 @@ func runJSON(cfg Config, configErr string, args []string) {
 		if report.Error != "" {
 			os.Exit(1)
 		}
+	// The browser commands share one preamble: they all need a database and
+	// they all take arguments, unlike the report commands above.
+	case "schemas", "objects", "describe", "search":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		runBrowserJSON(enc, cfg.Connections[0].URL, command, args[1:])
 	default:
 		_ = enc.Encode(map[string]any{
-			"error":    fmt.Sprintf("unknown command %q", command),
-			"commands": []string{"connections", "dashboard", "indexes", "locks", "maintenance", "sessions"},
+			"error": fmt.Sprintf("unknown command %q", command),
+			"commands": []string{
+				"connections", "dashboard", "describe", "indexes", "locks",
+				"maintenance", "objects", "schemas", "search", "sessions",
+			},
 		})
+		os.Exit(1)
+	}
+}
+
+// runBrowserJSON serves the object browser to an agent: the same collectors
+// the window uses, so both see one database and one truth.
+func runBrowserJSON(enc *json.Encoder, dbURL, command string, args []string) {
+	fail := func(usage string) {
+		_ = enc.Encode(map[string]string{"error": usage})
+		os.Exit(1)
+	}
+
+	failed := false
+	switch command {
+	case "schemas":
+		out := collectBrowserTree(context.Background(), dbURL)
+		_ = enc.Encode(out)
+		failed = out.Error != ""
+	case "objects":
+		if len(args) != 2 {
+			fail("usage: keikiban -json objects <schema> <tables|views|matviews|sequences>")
+		}
+		out := collectObjects(context.Background(), dbURL, args[0], args[1])
+		_ = enc.Encode(out)
+		failed = out.Error != ""
+	case "describe":
+		if len(args) != 2 {
+			fail("usage: keikiban -json describe <schema> <name>")
+		}
+		out := collectObjectDetail(context.Background(), dbURL, args[0], args[1])
+		_ = enc.Encode(out)
+		failed = out.Error != ""
+	case "search":
+		if len(args) != 1 {
+			fail("usage: keikiban -json search <term>")
+		}
+		out := searchObjects(context.Background(), dbURL, args[0])
+		_ = enc.Encode(out)
+		failed = out.Error != ""
+	}
+	if failed {
 		os.Exit(1)
 	}
 }
@@ -407,6 +463,195 @@ func runGUI(cfg Config, configErr string) {
 			return report, nil
 		}
 		return collectIndexReport(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("browserTree", func() (browserTreeOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return browserTreeOut{
+				Error:   err.Error(),
+				Schemas: []schemaNode{},
+			}, nil
+		}
+		return collectBrowserTree(context.Background(), dbURL), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("browserObjects", func(schema, group string) (objectListOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			out := emptyObjectList()
+			out.Error = err.Error()
+			return out, nil
+		}
+		return collectObjects(context.Background(), dbURL, schema, group), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// openObjectWindow gives one database object its own native window, so
+	// several can stay open side by side, each with its own tabs. glaze ends
+	// the run loop only when the LAST window closes, so these are ordinary
+	// windows of the same app rather than a second process.
+	//
+	// The window captures which object it shows, but never which database:
+	// activeDB is consulted on every query instead. A window that kept the URL
+	// it was born with would go on reading a server the user has since left,
+	// which is exactly what the one-connection-at-a-time rule exists to
+	// prevent.
+	openObjectWindow := func(schema, name string) {
+		ow, err := glaze.NewWithOptions(glaze.Options{
+			Debug:          debugMode,
+			SchemeHandlers: map[string]glaze.SchemeHandler{"app": serveAsset},
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			return
+		}
+		ow.SetTitle(schema + "." + name)
+		ow.SetSize(900, 680, glaze.HintNone)
+		ow.SetSize(420, 320, glaze.HintMin)
+
+		err = ow.Bind("objectDetail", func() (objectDetailOut, error) {
+			mu.Lock()
+			dbURL, dbErr := activeDB()
+			mu.Unlock()
+			if dbErr != nil {
+				out := emptyDetail()
+				out.Schema = schema
+				out.Name = name
+				out.Error = dbErr.Error()
+				return out, nil
+			}
+			return collectObjectDetail(context.Background(), dbURL, schema, name), nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		err = ow.Bind("initialQuery", func() (string, error) {
+			return initialQuery(schema, name), nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		// One query at a time per window, and always cancellable: a tool that
+		// cannot stop what it started is the complaint people file about the
+		// ones this replaces. queryCancel guards the running statement.
+		var queryMu sync.Mutex
+		var queryCancel context.CancelFunc
+
+		err = ow.Bind("runQuery", func(sql string) (queryOut, error) {
+			mu.Lock()
+			dbURL, dbErr := activeDB()
+			mu.Unlock()
+			if dbErr != nil {
+				out := emptyQueryOut()
+				out.SQL = sql
+				out.Error = dbErr.Error()
+				return out, nil
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			queryMu.Lock()
+			// A second Run replaces the first: the window shows one result, so
+			// leaving the previous statement running would burn a backend
+			// nobody is waiting on.
+			if queryCancel != nil {
+				queryCancel()
+			}
+			queryCancel = cancel
+			queryMu.Unlock()
+
+			defer func() {
+				queryMu.Lock()
+				if queryCancel != nil {
+					queryCancel()
+					queryCancel = nil
+				}
+				queryMu.Unlock()
+			}()
+			return runQuery(ctx, dbURL, sql), nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		err = ow.Bind("cancelQuery", func() error {
+			queryMu.Lock()
+			defer queryMu.Unlock()
+			if queryCancel == nil {
+				return nil
+			}
+			queryCancel()
+			queryCancel = nil
+			debugf("event=query_cancelled schema=%s name=%s", schema, name)
+			return nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		err = ow.Bind("logError", func(msg string) error {
+			debugf("event=ui_error window=%s.%s msg=%q", schema, name, msg)
+			return nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		debugf("event=object_window_open schema=%s name=%s", schema, name)
+		ow.Navigate("app://keikiban/object.html")
+	}
+
+	err = w.Bind("openObject", func(schema, name string) error {
+		mu.Lock()
+		_, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return err
+		}
+		// Creating a window is native UI work and belongs on the UI thread;
+		// bind callbacks run on their own goroutines.
+		w.Dispatch(func() { openObjectWindow(schema, name) })
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Bind("browserSearch", func(term string) (searchOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return searchOut{
+				Error: err.Error(),
+				Hits:  []searchHit{},
+			}, nil
+		}
+		return searchObjects(context.Background(), dbURL, term), nil
 	})
 	if err != nil {
 		log.Fatal(err)

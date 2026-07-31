@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>keikiban</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="object-window">
+  <main id="obj-shell">
+    <div class="dash-header">
+      <h2 id="obj-title">Loading...</h2>
+      <div class="buttons dash-actions">
+        <button type="button" id="obj-refresh">Refresh</button>
+      </div>
+    </div>
+    <p id="obj-status" class="hint" aria-live="polite"></p>
+
+    <div class="tabs" role="group" aria-label="Object tabs">
+      <button type="button" class="tab" data-tab="properties">Properties</button>
+      <button type="button" class="tab" data-tab="data">Data</button>
+    </div>
+
+    <div id="obj-props"></div>
+
+    <div id="obj-data" hidden>
+      <div id="sql-editor">
+        <label class="sr-only" for="sql-text">SQL statement</label>
+        <textarea id="sql-text" spellcheck="false" autocapitalize="off"
+          autocomplete="off" autocorrect="off" rows="5"></textarea>
+        <div id="sql-bar">
+          <span id="sql-status" class="hint" aria-live="polite"></span>
+          <span class="buttons">
+            <button type="button" id="sql-cancel" hidden>Cancel</button>
+            <button type="button" id="sql-run">Run</button>
+          </span>
+        </div>
+        <p class="hint">Enter inserts a line break; the statement runs only on
+          Run or <span id="sql-shortcut"></span>. Nothing here runs on its own.</p>
+      </div>
+      <div id="sql-result"></div>
+    </div>
+  </main>
+  <script src="icons.js"></script>
+  <script src="object.js"></script>
+</body>
+</html>
