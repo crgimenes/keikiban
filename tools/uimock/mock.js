@@ -12,11 +12,8 @@
 const PARAMS = new URLSearchParams(location.search);
 const THEME = PARAMS.get("theme");
 if (THEME) document.documentElement.style.colorScheme = THEME;
-// ?screen=indexes opens that screen straight away, so a headless capture can
-// reach every screen without clicking.
-if (PARAMS.get("screen")) {
-  localStorage.setItem("keikiban.screen", PARAMS.get("screen"));
-}
+// ?screen=indexes is read by app.js itself, so a headless capture reaches any
+// screen without clicking and the real app still always opens on the dashboard.
 
 async function recorded(name) {
   const r = await fetch("recorded/" + name + ".json");

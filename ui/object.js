@@ -17,8 +17,10 @@ const KIND_LABELS = {
   S: "sequence",
 };
 
-const TAB_KEY = "keikiban.objectTab";
-let tab = localStorage.getItem(TAB_KEY) || "properties";
+// A new window always opens on Properties. Deliberately not remembered:
+// localStorage is shared by every window of the app, so a sticky tab here
+// would make one table's habit leak into the next table's window.
+let tab = "properties";
 let detail = null;
 
 async function loadObject() {
@@ -199,6 +201,11 @@ let editorReady = false;
 // a webview reliably answers; the label is cosmetic either way.
 const MOD_LABEL = /mac/i.test(navigator.platform) ? "Cmd+Enter" : "Ctrl+Enter";
 
+// ensureEditor fills the editor the first time the data tab is shown, and runs
+// that first statement. Auto-running is safe here precisely because nothing is
+// hidden: the statement is on screen, bounded by LIMIT 100, and it is the same
+// one the user would have typed. It happens once — after that the statement
+// only runs when the user says so.
 async function ensureEditor() {
   if (editorReady) return;
   editorReady = true;
@@ -206,7 +213,9 @@ async function ensureEditor() {
     el("sql-text").value = await window.initialQuery();
   } catch (err) {
     el("sql-status").textContent = String(err);
+    return;
   }
+  await runSQL();
 }
 
 async function runSQL() {
@@ -321,7 +330,6 @@ el("sql-text").addEventListener("keydown", (e) => {
 for (const b of document.querySelectorAll(".tab[data-tab]")) {
   b.addEventListener("click", () => {
     tab = b.dataset.tab;
-    localStorage.setItem(TAB_KEY, tab);
     render();
     if (tab === "data") ensureEditor();
   });
@@ -332,5 +340,3 @@ el("obj-refresh").addEventListener("click", loadObject);
 
 render();
 loadObject();
-// Reopening on the Data tab must land on a usable editor, not an empty box.
-if (tab === "data") ensureEditor();

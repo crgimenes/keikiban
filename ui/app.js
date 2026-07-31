@@ -49,11 +49,14 @@ let state = { path: "", exists: false, error: "", connections: [] };
 // It only applies to the connections screen.
 let editingIndex = null;
 
-// One screen at a time, chosen in the sidebar. The dashboard is home.
-const SCREEN_KEY = "keikiban.screen";
+// One screen at a time, chosen in the sidebar. Opening the app always lands
+// on the dashboard — deliberately not remembered across runs: the monitoring
+// screen is the app's home, and a predictable start beats a sticky one. The
+// ?screen= override exists for the screenshot harness, which needs to open a
+// given screen headlessly; the app itself navigates with no query string.
 const SCREENS = ["dashboard", "browser", "sessions", "indexes", "maintenance",
   "connections"];
-let screen = localStorage.getItem(SCREEN_KEY) || "dashboard";
+let screen = new URLSearchParams(location.search).get("screen") || "dashboard";
 if (!SCREENS.includes(screen)) screen = "dashboard";
 
 const NAV_ICONS = {
@@ -79,7 +82,6 @@ function loadScreen(name) {
 
 function goTo(name) {
   screen = name;
-  localStorage.setItem(SCREEN_KEY, name);
   render();
   loadScreen(name);
 }
@@ -1143,17 +1145,47 @@ async function brToggle(key) {
   renderBrowser();
 }
 
-// brSelect opens the object in its own native window. Keeping the properties
-// out of this screen is what lets several objects stay open at once, each with
-// its own tabs; the tree keeps the selection only to show where you last went.
-async function brSelect(schema, name) {
-  brSelected = schema + "." + name;
-  renderBrowser();
+// brHighlight marks where you are without opening anything. It moves the mark
+// in place instead of redrawing the tree: rebuilding the nodes between the two
+// clicks of a double-click would replace the element mid-gesture, and the
+// dblclick would never fire.
+function brHighlight(node, key) {
+  brSelected = key;
+  for (const n of document.querySelectorAll("#br-tree .br-node[aria-current]")) {
+    n.removeAttribute("aria-current");
+  }
+  node.setAttribute("aria-current", "true");
+}
+
+// brOpenObject opens the object in its own native window. Keeping the
+// properties out of this screen is what lets several objects stay open at
+// once, each with its own tabs.
+async function brOpenObject(schema, name) {
   try {
     await window.openObject(schema, name);
   } catch (err) {
     el("br-status").textContent = String(err);
   }
+}
+
+// brObjectNode wires one openable object: a click marks it, a double-click
+// opens it. Enter does the same as the double-click, because a double-click
+// has no keyboard equivalent and the tree has to stay usable without a mouse.
+function brObjectNode(className, schema, name, opts = {}) {
+  const key = schema + "." + name;
+  const node = brNode(className, opts.label || name, {
+    kind: opts.kind,
+    current: brSelected === key,
+  });
+  node.addEventListener("click", () => brHighlight(node, key));
+  node.addEventListener("dblclick", () => brOpenObject(schema, name));
+  node.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    brHighlight(node, key);
+    brOpenObject(schema, name);
+  });
+  return node;
 }
 
 // brRunSearch asks the server, so a match is found whether or not its branch
@@ -1237,10 +1269,9 @@ function renderBrowserSearch(tree) {
     : brSearch.total + (brSearch.total === 1 ? " match" : " matches");
 
   for (const h of brSearch.hits) {
-    tree.append(brNode("br-hit", h.schema + "." + h.name, {
+    tree.append(brObjectNode("br-hit", h.schema, h.name, {
+      label: h.schema + "." + h.name,
       kind: KIND_LABELS[h.kind] || h.kind,
-      current: brSelected === h.schema + "." + h.name,
-      onClick: () => brSelect(h.schema, h.name),
     }));
   }
 }
@@ -1285,10 +1316,7 @@ function renderBrowserTree(tree) {
         continue;
       }
       for (const o of list.objects) {
-        tree.append(brNode("br-leaf", o.name, {
-          current: brSelected === o.schema + "." + o.name,
-          onClick: () => brSelect(o.schema, o.name),
-        }));
+        tree.append(brObjectNode("br-leaf", o.schema, o.name));
       }
       if (list.truncated) {
         const more = document.createElement("p");

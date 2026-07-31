@@ -255,6 +255,16 @@ type testResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// mustBind registers a bind the window cannot work without. A failure here is
+// a programming error (duplicate or reserved name), never a runtime condition,
+// so it stops the app before a half-wired page could reach the user.
+func mustBind(w glaze.WebView, name string, fn any) {
+	err := w.Bind(name, fn)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func runGUI(cfg Config, configErr string) {
 	w, err := glaze.NewWithOptions(glaze.Options{
 		Debug:          debugMode,
@@ -360,18 +370,15 @@ func runGUI(cfg Config, configErr string) {
 		}
 	}
 
-	err = w.Bind("configState", func() (uiState, error) {
+	mustBind(w, "configState", func() (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		return state(), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// connectTo attaches to one connection and, by doing so, detaches from
 	// the previous one: keikiban is never attached to two servers at once.
-	err = w.Bind("connectTo", func(index int) (uiState, error) {
+	mustBind(w, "connectTo", func(index int) (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if index < 0 || index >= len(cfg.Connections) {
@@ -381,15 +388,12 @@ func runGUI(cfg Config, configErr string) {
 		ensureSampler()
 		return state(), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// disconnect closes the open connection and leaves keikiban attached to
 	// nothing: the sampler stops polling and the window title stops naming a
 	// server. Being attached to no database is a legitimate resting state, not
 	// an error to recover from.
-	err = w.Bind("disconnect", func() (uiState, error) {
+	mustBind(w, "disconnect", func() (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		activeIndex = -1
@@ -397,11 +401,8 @@ func runGUI(cfg Config, configErr string) {
 		debugf("event=disconnected")
 		return state(), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("dashboardState", func(windowSeconds int, sliceBy, topBy string) (dashOut, error) {
+	mustBind(w, "dashboardState", func(windowSeconds int, sliceBy, topBy string) (dashOut, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if sampler == nil {
@@ -432,28 +433,19 @@ func runGUI(cfg Config, configErr string) {
 		out.URL = conn.MaskedURL
 		return out, nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("testConnection", func(dbURL string) (testResult, error) {
+	mustBind(w, "testConnection", func(dbURL string) (testResult, error) {
 		return testConnection(dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// A JS exception inside the webview is invisible from the terminal; the
 	// page forwards them here so -debug shows UI failures too.
-	err = w.Bind("logError", func(msg string) error {
+	mustBind(w, "logError", func(msg string) error {
 		debugf("event=ui_error msg=%q", msg)
 		return nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("indexReport", func() (indexReport, error) {
+	mustBind(w, "indexReport", func() (indexReport, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -464,11 +456,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectIndexReport(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("browserTree", func() (browserTreeOut, error) {
+	mustBind(w, "browserTree", func() (browserTreeOut, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -480,11 +469,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectBrowserTree(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("browserObjects", func(schema, group string) (objectListOut, error) {
+	mustBind(w, "browserObjects", func(schema, group string) (objectListOut, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -495,9 +481,6 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectObjects(context.Background(), dbURL, schema, group), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// openObjectWindow gives one database object its own native window, so
 	// several can stay open side by side, each with its own tabs. glaze ends
@@ -625,7 +608,7 @@ func runGUI(cfg Config, configErr string) {
 		ow.Navigate("app://keikiban/object.html")
 	}
 
-	err = w.Bind("openObject", func(schema, name string) error {
+	mustBind(w, "openObject", func(schema, name string) error {
 		mu.Lock()
 		_, err := activeDB()
 		mu.Unlock()
@@ -637,11 +620,8 @@ func runGUI(cfg Config, configErr string) {
 		w.Dispatch(func() { openObjectWindow(schema, name) })
 		return nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("browserSearch", func(term string) (searchOut, error) {
+	mustBind(w, "browserSearch", func(term string) (searchOut, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -653,13 +633,10 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return searchObjects(context.Background(), dbURL, term), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// signalBackend cancels a query or terminates a connection: the same
 	// statement the confirmation dialog displayed.
-	err = w.Bind("signalBackend", func(pid int, terminate bool) error {
+	mustBind(w, "signalBackend", func(pid int, terminate bool) error {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -668,11 +645,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return cancelBackend(context.Background(), dbURL, pid, terminate)
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("sessionList", func() (sessionsOut, error) {
+	mustBind(w, "sessionList", func() (sessionsOut, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -684,11 +658,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectSessions(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("maintenanceReport", func() (maintenanceReport, error) {
+	mustBind(w, "maintenanceReport", func() (maintenanceReport, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -699,11 +670,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectMaintenance(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("vacuumProgress", func() (vacuumProgressOut, error) {
+	mustBind(w, "vacuumProgress", func() (vacuumProgressOut, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -712,11 +680,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectVacuumProgress(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("vacuumTable", func(schema, table string) (maintenanceReport, error) {
+	mustBind(w, "vacuumTable", func(schema, table string) (maintenanceReport, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -729,11 +694,8 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectMaintenance(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("dropIndex", func(schema, name string) (indexReport, error) {
+	mustBind(w, "dropIndex", func(schema, name string) (indexReport, error) {
 		mu.Lock()
 		dbURL, err := activeDB()
 		mu.Unlock()
@@ -746,9 +708,6 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return collectIndexReport(context.Background(), dbURL), nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// reload re-reads the config after a mutation so the UI always reflects
 	// the file, the single source of truth. Assumes mu is held.
@@ -771,7 +730,7 @@ func runGUI(cfg Config, configErr string) {
 		return nil
 	}
 
-	err = w.Bind("addConnection", func(dbURL, title string) (uiState, error) {
+	mustBind(w, "addConnection", func(dbURL, title string) (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		dbURL = strings.TrimSpace(dbURL)
@@ -786,11 +745,8 @@ func runGUI(cfg Config, configErr string) {
 		debugf("event=connection_added url=%s", maskURL(dbURL))
 		return reload()
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("updateConnection", func(index int, dbURL, title string) (uiState, error) {
+	mustBind(w, "updateConnection", func(index int, dbURL, title string) (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		dbURL = strings.TrimSpace(dbURL)
@@ -805,11 +761,8 @@ func runGUI(cfg Config, configErr string) {
 		debugf("event=connection_updated index=%d url=%s", index, maskURL(dbURL))
 		return reload()
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = w.Bind("deleteConnection", func(index int) (uiState, error) {
+	mustBind(w, "deleteConnection", func(index int) (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		err := deleteConnection(cfg.Path, index)
@@ -828,13 +781,10 @@ func runGUI(cfg Config, configErr string) {
 		debugf("event=connection_deleted index=%d", index)
 		return reload()
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// makeDefault promotes a connection to first in the file, which is what
 	// "default" means here: the one keikiban attaches to when it opens.
-	err = w.Bind("makeDefault", func(index int) (uiState, error) {
+	mustBind(w, "makeDefault", func(index int) (uiState, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		err := makeDefaultConnection(cfg.Path, index)
@@ -852,13 +802,10 @@ func runGUI(cfg Config, configErr string) {
 		debugf("event=connection_promoted index=%d", index)
 		return reload()
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// connectionURL hands the real URL (password included) to the edit form
 	// only; every displayed or logged URL stays masked.
-	err = w.Bind("connectionURL", func(index int) (string, error) {
+	mustBind(w, "connectionURL", func(index int) (string, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if index < 0 || index >= len(cfg.Connections) {
@@ -866,9 +813,6 @@ func runGUI(cfg Config, configErr string) {
 		}
 		return cfg.Connections[index].URL, nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// The Edit menu is not cosmetic on macOS: its native selectors are the only
 	// route Cocoa gives Cmd+X/C/V/A into the WKWebView's editing commands.
@@ -880,6 +824,13 @@ func runGUI(cfg Config, configErr string) {
 		}},
 	}
 	if runtime.GOOS == "darwin" {
+		// This is a desktop app, and with one window per object it is a
+		// multi-window one: Cmd+W closing the key window is basic macOS
+		// hygiene. performClose: targets whichever window is key, so the same
+		// menu item serves the main window and every object window.
+		items = append(items, menu.Item{Title: "File", Submenu: []menu.Item{
+			{Title: "Close Window", Shortcut: "cmd+w", Selector: "performClose:"},
+		}})
 		items = append(items, menu.Item{Title: "Edit", Submenu: []menu.Item{
 			{Title: "Undo", Shortcut: "cmd+z", Selector: "undo:"},
 			{Title: "Redo", Shortcut: "cmd+shift+z", Selector: "redo:"},
