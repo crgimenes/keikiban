@@ -52,6 +52,9 @@ The macOS build is signed and notarized, so it opens normally. If you build it
 yourself and Gatekeeper complains, `xattr -dr com.apple.quarantine keikiban`
 clears it. Windows SmartScreen may want "More info" then "Run anyway".
 
+On Linux the interface needs WebKitGTK at runtime: `libwebkit2gtk-4.1-0` on
+Debian/Ubuntu, `webkit2gtk4.1` on Fedora.
+
 ## Configure
 
 Connections live in a [Filo](https://github.com/crgimenes/filo) file at
