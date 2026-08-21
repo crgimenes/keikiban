@@ -56,7 +56,11 @@ jobs:
         if: runner.os != 'Windows'
         run: test -z "$(gofmt -l .)"
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+        # Keep this at a version built for the Go in go.mod: v2.12.2's
+        # staticcheck predates Go 1.27 and panics on its stdlib (buildir,
+        # "unexpected expr" in internal/poll — Linux runners only, where the
+        # offending code path exists).
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
       - run: golangci-lint run ./...
 
   security:
@@ -80,6 +84,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The interface is plain JS with no build step, so nothing else would
-      # catch a syntax error before it reaches the window at runtime.
-      - run: node --check ui/app.js
-      - run: node --check tools/uimock/mock.js
+      # catch a syntax error before it reaches the window at runtime. The glob
+      # covers files added later; a fixed list already missed object.js once.
+      - run: |
+          for f in ui/*.js tools/uimock/*.js; do
+            echo "check $f"
+            node --check "$f" || exit 1
+          done
