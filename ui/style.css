@@ -427,6 +427,25 @@
     /* A NULL is not an empty string, and the grid must never let the two look
        alike. */
     .cell-null { opacity: 0.55; font-style: italic; }
+    /* Only cells backed by a real column of one table can be written back;
+       the rest stay plainly read-only. */
+    .cell-editable { cursor: text; }
+    .cell-editable:hover { background: rgba(127, 127, 127, 0.15); }
+    .cell-changed {
+      background: rgba(127, 127, 127, 0.22);
+      font-weight: 600;
+    }
+    .cell-input {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85rem;
+      width: 12rem;
+      max-width: 100%;
+    }
+    .cell-null-btn {
+      font-size: 0.7rem;
+      margin-left: 0.3rem;
+      padding: 0 0.3rem;
+    }
     table.grid {
       border-collapse: collapse;
       font-size: 0.85rem;

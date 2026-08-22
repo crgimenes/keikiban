@@ -193,6 +193,9 @@ function renderProperties() {
    change — never something the app decided on its own. */
 
 let running = false;
+// result is the last answer from the editor; the grid edits are relative to
+// it. pending holds the cells changed since then.
+let result = null;
 // The editor is loaded once, when the Data tab is first opened: reloading it
 // on every tab switch would throw away whatever the user had typed.
 let editorReady = false;
@@ -221,6 +224,9 @@ async function ensureEditor() {
 async function runSQL() {
   if (running) return;
   running = true;
+  // A new answer replaces the rows the pending edits pointed at, so keeping
+  // them would aim an UPDATE at whatever now sits in that position.
+  pending.clear();
   el("sql-run").disabled = true;
   el("sql-cancel").hidden = false;
   el("sql-status").textContent = "Running...";
@@ -247,8 +253,12 @@ async function cancelSQL() {
 }
 
 function renderResult(out) {
+  // The last result stays around: the grid edits refer to its rows, columns
+  // and target, and a stale copy would write to the wrong place.
+  result = out;
   const box = el("sql-result");
   box.replaceChildren();
+  el("grid-note").textContent = "";
 
   if (out.error) {
     el("sql-status").textContent = "";
@@ -297,26 +307,235 @@ function renderResult(out) {
     head.append(th);
   }
   const body = table.createTBody();
-  for (const r of out.rows) {
+  out.rows.forEach((r, rowIndex) => {
     const row = body.insertRow();
-    for (const v of r) {
+    r.forEach((v, colIndex) => {
       const td = row.insertCell();
-      // null is SQL NULL; "" is a real empty string. They must not look alike.
-      if (v === null) {
-        td.textContent = "NULL";
-        td.className = "cell-null";
-        continue;
-      }
-      td.textContent = v;
-      td.title = v;
-    }
-  }
+      paintCell(td, v);
+      if (!out.target.editable || !out.editable[colIndex]) return;
+      td.classList.add("cell-editable");
+      td.title = "Double-click to edit";
+      td.addEventListener("dblclick", () => editCell(td, rowIndex, colIndex));
+    });
+  });
   box.append(table);
+
+  const note = el("grid-note");
+  if (out.target.editable) {
+    note.textContent = "Editing " + out.target.schema + "." + out.target.table +
+      " — double-click a cell. Save shows the exact UPDATE first.";
+  }
+  if (!out.target.editable) {
+    note.textContent = out.target.reason
+      ? "Read-only: " + out.target.reason + "."
+      : "";
+  }
+  renderPending();
+}
+
+// paintCell keeps SQL NULL and the empty string distinguishable, on screen
+// and in the data behind it.
+function paintCell(td, v) {
+  td.classList.remove("cell-null", "cell-changed");
+  if (v === null) {
+    td.textContent = "NULL";
+    td.classList.add("cell-null");
+    return;
+  }
+  td.textContent = v;
+  if (v !== "") td.title = v;
+}
+
+/* Editing the grid ---------------------------------------------------------
+   Which results can be written back is decided by the server and arrives with
+   the result; the page never guesses. Edits are collected per row and saved
+   one row at a time, showing the exact UPDATE first — the same anatomy as
+   dropping an index, and for the same reason: the connected database may be
+   production. */
+
+// pending maps a row index to {column: value}, value null meaning SQL NULL.
+let pending = new Map();
+
+function renderPending() {
+  const n = pending.size;
+  el("grid-save").hidden = n === 0;
+  el("grid-discard").hidden = n === 0;
+  el("grid-save").textContent = n === 1
+    ? "Save 1 row"
+    : "Save " + n + " rows";
+}
+
+// editCell swaps the cell for an input. Escape cancels, Enter commits to the
+// pending set (not to the database), and the NULL button is explicit because
+// clearing the text means the empty string, which is a different value.
+function editCell(td, rowIndex, colIndex) {
+  if (td.querySelector("input")) return;
+
+  const col = result.columns[colIndex].name;
+  const current = pendingValue(rowIndex, col, result.rows[rowIndex][colIndex]);
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "cell-input";
+  input.value = current === null ? "" : current;
+  const nullBtn = document.createElement("button");
+  nullBtn.type = "button";
+  nullBtn.className = "cell-null-btn";
+  nullBtn.textContent = "NULL";
+  nullBtn.title = "Set this cell to SQL NULL";
+
+  const close = (value) => {
+    td.replaceChildren();
+    if (value !== undefined) stageEdit(rowIndex, col, value);
+    const staged = pendingValue(rowIndex, col, result.rows[rowIndex][colIndex]);
+    paintCell(td, staged);
+    if (rowChanged(rowIndex)) td.classList.add("cell-changed");
+    renderPending();
+  };
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close(undefined);
+    if (e.key === "Enter") close(input.value);
+  });
+  input.addEventListener("blur", () => close(input.value));
+  nullBtn.addEventListener("mousedown", (e) => {
+    // mousedown, not click: blur would fire first and close the editor.
+    e.preventDefault();
+    close(null);
+  });
+
+  td.replaceChildren(input, nullBtn);
+  input.focus();
+  input.select();
+}
+
+function pendingValue(rowIndex, col, original) {
+  const row = pending.get(rowIndex);
+  if (row && Object.prototype.hasOwnProperty.call(row, col)) return row[col];
+  return original;
+}
+
+function rowChanged(rowIndex) {
+  return pending.has(rowIndex);
+}
+
+// stageEdit records a change, and forgets it again when the value returns to
+// what the database gave: a row with nothing different is not a pending save.
+function stageEdit(rowIndex, col, value) {
+  const colIndex = result.columns.findIndex((c) => c.name === col);
+  const original = result.rows[rowIndex][colIndex];
+  const row = pending.get(rowIndex) || {};
+
+  if (value === original) {
+    delete row[col];
+  } else {
+    row[col] = value;
+  }
+  if (Object.keys(row).length === 0) {
+    pending.delete(rowIndex);
+    return;
+  }
+  pending.set(rowIndex, row);
+}
+
+// saveInFor builds one row's payload: the changed columns plus the primary
+// key values as they were read, which is what finds the row again.
+function saveInFor(rowIndex) {
+  const row = pending.get(rowIndex);
+  const edits = Object.keys(row).map((c) => ({ column: c, value: row[c] }));
+  const key = result.target.pkColumns.map((c) => ({
+    column: c,
+    value: result.rows[rowIndex][result.columns.findIndex((x) => x.name === c)],
+  }));
+  return {
+    schema: result.target.schema,
+    table: result.target.table,
+    edits,
+    key,
+  };
+}
+
+async function gridAskConfirm() {
+  el("grid-result").textContent = "";
+  const rows = [...pending.keys()].sort((a, b) => a - b);
+  const previews = [];
+  for (const rowIndex of rows) {
+    let p = null;
+    try {
+      p = await window.gridPreview(saveInFor(rowIndex));
+    } catch (err) {
+      p = { error: String(err) };
+    }
+    if (p.error) {
+      el("grid-result").textContent = p.error;
+      return;
+    }
+    previews.push(p.sql);
+  }
+
+  el("grid-confirm-text").textContent = rows.length === 1
+    ? "Save this row to " + result.target.schema + "." + result.target.table +
+      "? This is exactly what will run:"
+    : "Save " + rows.length + " rows to " + result.target.schema + "." +
+      result.target.table + "? This is exactly what will run:";
+  const box = el("grid-confirm-sql");
+  box.replaceChildren();
+  for (const sql of previews) {
+    const pre = document.createElement("div");
+    pre.className = "sql-text";
+    pre.textContent = sql;
+    box.append(pre);
+  }
+  el("grid-confirm").hidden = false;
+}
+
+async function gridConfirm() {
+  el("grid-go").disabled = true;
+  const rows = [...pending.keys()].sort((a, b) => a - b);
+  let saved = 0;
+  let failure = "";
+
+  for (const rowIndex of rows) {
+    let out = null;
+    try {
+      out = await window.gridSave(saveInFor(rowIndex));
+    } catch (err) {
+      out = { error: String(err) };
+    }
+    if (out.error) {
+      failure = out.error;
+      break;
+    }
+    saved++;
+    pending.delete(rowIndex);
+  }
+
+  el("grid-go").disabled = false;
+  el("grid-confirm").hidden = true;
+  // Each row is its own statement, so a failure halfway leaves the earlier
+  // rows saved. Saying how many went through beats a bare error.
+  el("grid-result").textContent = failure
+    ? "saved " + saved + " row(s), then stopped: " + failure
+    : "saved " + saved + " row(s)";
+  renderPending();
+  if (saved > 0) runSQL();
+}
+
+function gridDiscard() {
+  pending.clear();
+  el("grid-result").textContent = "";
+  renderResult(result);
 }
 
 el("sql-shortcut").textContent = MOD_LABEL;
 el("sql-run").addEventListener("click", runSQL);
 el("sql-cancel").addEventListener("click", cancelSQL);
+el("grid-save").addEventListener("click", gridAskConfirm);
+el("grid-discard").addEventListener("click", gridDiscard);
+el("grid-cancel").addEventListener("click", () => {
+  el("grid-confirm").hidden = true;
+});
+el("grid-go").addEventListener("click", gridConfirm);
 
 // Enter belongs to the text: this is an editor, and a stray newline must never
 // fire a statement at a database. Only the modifier chord runs it.

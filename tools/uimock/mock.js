@@ -95,12 +95,50 @@ window.initialQuery = async () => {
   return 'SELECT *\nFROM "' + schema + '"."' + name + '"\nLIMIT 100\nOFFSET 0;';
 };
 
+// A small editable result so the grid can be worked on offline. The shape is
+// the app's own; the rows are fictional and no published screenshot uses this
+// screen, so the real-data rule is not touched.
+const GRID = {
+  columns: [
+    { name: "id", type: "int8" },
+    { name: "name", type: "text" },
+    { name: "age", type: "int4" },
+  ],
+  rows: [["1", "ana", "30"], ["2", null, "40"], ["3", "", "50"]],
+};
+
 window.runQuery = async (sql) => ({
   sql,
-  error: "the mocked UI has no database behind it; run the app to execute SQL",
-  columns: [],
-  rows: [],
+  columns: GRID.columns,
+  rows: GRID.rows.map((r) => [...r]),
+  returnsRows: true,
+  truncated: false,
+  command: "SELECT 3",
+  affected: 3,
+  elapsedMS: 1.2,
+  target: {
+    editable: true,
+    schema: "public",
+    table: "people",
+    pkColumns: ["id"],
+  },
+  editable: [true, true, true],
 });
+
+window.gridPreview = async (in_) => ({
+  sql: 'UPDATE "public"."people"\nSET ' +
+    in_.edits.map((e, i) => '"' + e.column + '" = $' + (i + 1) + "::text").join(",\n    ") +
+    '\nWHERE "id" = $' + (in_.edits.length + 1) + "::int8;",
+});
+
+window.gridSave = async (in_) => {
+  const row = GRID.rows.find((r) => r[0] === in_.key[0].value);
+  for (const e of in_.edits) {
+    const i = GRID.columns.findIndex((c) => c.name === e.column);
+    row[i] = e.value;
+  }
+  return { affected: 1 };
+};
 
 window.cancelQuery = async () => {};
 

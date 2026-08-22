@@ -35,6 +35,9 @@ go.work.sum
 .DS_Store
 .env
 
+# Local planning: the roadmap is not published ahead of time.
+TODO.md
+
 # Editor/IDE
 # .idea/
 # .vscode/

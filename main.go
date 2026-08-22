@@ -616,6 +616,39 @@ func runGUI(cfg Config, configErr string) {
 			return
 		}
 
+		// The grid's write path: preview first, then save. Same anatomy as
+		// every other write in this app, and for the same reason — the
+		// default connection may be production.
+		err = ow.Bind("gridPreview", func(in gridSaveIn) (gridSaveOut, error) {
+			mu.Lock()
+			dbURL, dbErr := activeDB()
+			mu.Unlock()
+			if dbErr != nil {
+				return gridSaveOut{Error: dbErr.Error()}, nil
+			}
+			return previewRowUpdate(context.Background(), dbURL, in), nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
+		err = ow.Bind("gridSave", func(in gridSaveIn) (gridSaveOut, error) {
+			mu.Lock()
+			dbURL, dbErr := activeDB()
+			mu.Unlock()
+			if dbErr != nil {
+				return gridSaveOut{Error: dbErr.Error()}, nil
+			}
+			return saveRowUpdate(context.Background(), dbURL, in), nil
+		})
+		if err != nil {
+			debugf("event=object_window_error schema=%s name=%s err=%q", schema, name, err)
+			ow.Destroy()
+			return
+		}
+
 		err = ow.Bind("logError", func(msg string) error {
 			debugf("event=ui_error window=%s.%s msg=%q", schema, name, msg)
 			return nil

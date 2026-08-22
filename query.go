@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // The SQL editor. There is exactly one, and every screen that shows data goes
@@ -57,6 +58,11 @@ type queryOut struct {
 	Command     string  `json:"command"`
 	Affected    int64   `json:"affected"`
 	ElapsedMS   float64 `json:"elapsedMS"`
+	// Target says whether the grid may write these rows back, and why not
+	// when it may not.
+	Target gridTarget `json:"target"`
+	// Editable marks, per column, whether it came from the target table.
+	Editable []bool `json:"editable"`
 }
 
 func emptyQueryOut() queryOut {
@@ -120,6 +126,10 @@ func runQuery(ctx context.Context, dbURL, sql string) queryOut {
 		out.Columns = append(out.Columns, col)
 	}
 
+	// The descriptors have to be copied: pgx reuses that slice for the next
+	// query, and the grid target is worked out after this one is closed.
+	fieldCopy := append([]pgconn.FieldDescription(nil), fields...)
+
 	for rows.Next() {
 		if len(out.Rows) >= queryRowLimit {
 			out.Truncated = true
@@ -143,6 +153,18 @@ func runQuery(ctx context.Context, dbURL, sql string) queryOut {
 	if rows.Err() != nil && !out.Truncated {
 		out.Error = rows.Err().Error()
 		return out
+	}
+
+	// Whether these rows can be written back is decided once, from what the
+	// server said about the columns. It runs only now: a second query on the
+	// same connection while the first one still has rows open is refused.
+	if out.ReturnsRows {
+		target, gcols := detectGridTarget(qctx, conn, fieldCopy, out.Columns)
+		out.Target = target
+		out.Editable = make([]bool, len(gcols))
+		for i, g := range gcols {
+			out.Editable[i] = g.Editable
+		}
 	}
 
 	tag := rows.CommandTag()

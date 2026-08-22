@@ -40,6 +40,20 @@
           it is yours: Enter inserts a line break, and running it again takes
           Run or <span id="sql-shortcut"></span>.</p>
       </div>
+      <p id="grid-note" class="hint"></p>
+      <div class="buttons">
+        <button type="button" id="grid-discard" hidden>Discard changes</button>
+        <button type="button" id="grid-save" hidden></button>
+      </div>
+      <div id="grid-confirm" hidden>
+        <p id="grid-confirm-text"></p>
+        <div id="grid-confirm-sql"></div>
+        <div class="buttons">
+          <button type="button" id="grid-cancel">Cancel</button>
+          <button type="button" id="grid-go" class="destructive">Save</button>
+        </div>
+      </div>
+      <p id="grid-result" aria-live="polite"></p>
       <div id="sql-result"></div>
     </div>
   </main>

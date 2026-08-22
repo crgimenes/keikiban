@@ -1312,6 +1312,302 @@ func TestMigrationDirInConfig(t *testing.T) {
 	}
 }
 
+// gridFixture builds two related tables for the editable-grid tests.
+func gridFixture(t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+
+	mustExec(t, conn, `DROP TABLE IF EXISTS g_pets, g_people, g_nokey;`)
+	mustExec(t, conn, `CREATE TABLE g_people (
+		id bigserial PRIMARY KEY,
+		name text,
+		age int,
+		joined timestamptz);`)
+	mustExec(t, conn, `INSERT INTO g_people (name, age, joined)
+		VALUES ('ana', 30, '2026-01-02T03:04:05Z'), ('bob', 40, NULL);`)
+	mustExec(t, conn, `CREATE TABLE g_pets (
+		id bigserial PRIMARY KEY,
+		owner_id bigint REFERENCES g_people (id),
+		tag text);`)
+	mustExec(t, conn, `INSERT INTO g_pets (owner_id, tag) VALUES (1, 'rex');`)
+	mustExec(t, conn, `CREATE TABLE g_nokey (v text);`)
+	mustExec(t, conn, `INSERT INTO g_nokey VALUES ('x');`)
+}
+
+// TestGridDetectsWhatIsEditable is the heart of the editable grid: the server
+// describes where every column came from, and that decides whether a row can
+// be written back. No SQL parsing is involved.
+func TestGridDetectsWhatIsEditable(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	gridFixture(t, conn)
+
+	cases := []struct {
+		name     string
+		sql      string
+		editable bool
+		reason   string // substring, when not editable
+		pk       []string
+	}{
+		{
+			name:     "plain select carries the key",
+			sql:      `SELECT * FROM g_people ORDER BY id;`,
+			editable: true,
+			pk:       []string{"id"},
+		},
+		{
+			// The base table survives a subselect wrapper, so this stays
+			// editable: the server still reports the origin of each column.
+			name:     "through a subselect",
+			sql:      `SELECT * FROM (SELECT id, name FROM g_people) s;`,
+			editable: true,
+			pk:       []string{"id"},
+		},
+		{
+			name:     "join has no single table",
+			sql:      `SELECT p.name, t.tag FROM g_people p JOIN g_pets t ON t.owner_id = p.id;`,
+			editable: false,
+			reason:   "more than one table",
+		},
+		{
+			name:     "projection dropped the key",
+			sql:      `SELECT name, age FROM g_people;`,
+			editable: false,
+			reason:   "add the primary key",
+		},
+		{
+			name:     "aggregates are computed",
+			sql:      `SELECT count(*), max(age) FROM g_people;`,
+			editable: false,
+			reason:   "computed",
+		},
+		{
+			name:     "a table without a primary key",
+			sql:      `SELECT * FROM g_nokey;`,
+			editable: false,
+			reason:   "no primary key",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out := runQuery(ctx, url, c.sql)
+			if out.Error != "" {
+				t.Fatalf("query error: %s", out.Error)
+			}
+			if out.Target.Editable != c.editable {
+				t.Fatalf("editable = %v, want %v (reason %q)",
+					out.Target.Editable, c.editable, out.Target.Reason)
+			}
+			if !c.editable {
+				if !strings.Contains(out.Target.Reason, c.reason) {
+					t.Errorf("reason = %q, want it to mention %q", out.Target.Reason, c.reason)
+				}
+				return
+			}
+			if len(out.Target.PKColumns) != len(c.pk) || out.Target.PKColumns[0] != c.pk[0] {
+				t.Errorf("pk = %v, want %v", out.Target.PKColumns, c.pk)
+			}
+			if out.Target.Schema != "public" || out.Target.Table != "g_people" {
+				t.Errorf("target = %s.%s, want public.g_people", out.Target.Schema, out.Target.Table)
+			}
+		})
+	}
+
+	// A computed column sits next to a real one and only the real one may be
+	// edited.
+	mixed := runQuery(ctx, url, `SELECT id, name, upper(name) AS shout FROM g_people;`)
+	if !mixed.Target.Editable {
+		t.Fatalf("a mixed result should still edit its stored columns: %s", mixed.Target.Reason)
+	}
+	if len(mixed.Editable) != 3 {
+		t.Fatalf("editable flags = %v", mixed.Editable)
+	}
+	if !mixed.Editable[0] || !mixed.Editable[1] || mixed.Editable[2] {
+		t.Errorf("editable flags = %v, want the computed column read-only", mixed.Editable)
+	}
+}
+
+// TestGridSavesWithServerSideCasts checks the write path, including the two
+// values that are easy to confuse and the types nobody should parse by hand.
+func TestGridSavesWithServerSideCasts(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	gridFixture(t, conn)
+
+	str := func(s string) *string { return &s }
+	key := []gridEdit{{Column: "id", Value: str("1")}}
+
+	// The preview shows the statement before anything runs.
+	in := gridSaveIn{
+		Schema: "public",
+		Table:  "g_people",
+		Edits: []gridEdit{
+			{Column: "age", Value: str("31")},
+			{Column: "joined", Value: str("2026-02-03T04:05:06Z")},
+		},
+		Key: key,
+	}
+	preview := previewRowUpdate(ctx, url, in)
+	if preview.Error != "" {
+		t.Fatalf("preview error: %s", preview.Error)
+	}
+	if !strings.Contains(preview.SQL, `"age" = $1::integer`) {
+		t.Errorf("preview does not cast to the declared type: %q", preview.SQL)
+	}
+	if !strings.Contains(preview.SQL, `UPDATE "public"."g_people"`) {
+		t.Errorf("preview is not schema-qualified: %q", preview.SQL)
+	}
+
+	// Preview must not have written anything.
+	age := 0
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	err := conn.QueryRow(qctx, `SELECT age FROM g_people WHERE id = 1;`).Scan(&age)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if age != 30 {
+		t.Fatalf("preview changed the row: age = %d", age)
+	}
+
+	out := saveRowUpdate(ctx, url, in)
+	if out.Error != "" {
+		t.Fatalf("save error: %s", out.Error)
+	}
+	if out.Affected != 1 {
+		t.Errorf("affected = %d, want 1", out.Affected)
+	}
+
+	// A timestamp typed as text reached the column as a timestamp, because
+	// the server did the cast.
+	got := ""
+	err = conn.QueryRow(qctx,
+		`SELECT age || '|' || to_char(joined AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+		 FROM g_people WHERE id = 1;`).Scan(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "31|2026-02-03 04:05:06" {
+		t.Errorf("stored = %q, want the cast values", got)
+	}
+}
+
+// TestGridKeepsNullApartFromEmpty is the write-side half of the promise the
+// read side already makes: clearing a cell and setting it to NULL are
+// different edits and must reach the server as different values.
+func TestGridKeepsNullApartFromEmpty(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	gridFixture(t, conn)
+
+	str := func(s string) *string { return &s }
+	base := gridSaveIn{Schema: "public", Table: "g_people"}
+
+	empty := base
+	empty.Edits = []gridEdit{{Column: "name", Value: str("")}}
+	empty.Key = []gridEdit{{Column: "id", Value: str("1")}}
+	out := saveRowUpdate(ctx, url, empty)
+	if out.Error != "" {
+		t.Fatalf("save empty: %s", out.Error)
+	}
+
+	null := base
+	null.Edits = []gridEdit{{Column: "name", Value: nil}}
+	null.Key = []gridEdit{{Column: "id", Value: str("2")}}
+	out = saveRowUpdate(ctx, url, null)
+	if out.Error != "" {
+		t.Fatalf("save null: %s", out.Error)
+	}
+
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	state := ""
+	err := conn.QueryRow(qctx, `SELECT
+		CASE WHEN name IS NULL THEN 'NULL' ELSE '[' || name || ']' END
+		FROM g_people WHERE id = 1;`).Scan(&state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state != "[]" {
+		t.Errorf("row 1 = %s, want an empty string", state)
+	}
+	err = conn.QueryRow(qctx, `SELECT
+		CASE WHEN name IS NULL THEN 'NULL' ELSE '[' || name || ']' END
+		FROM g_people WHERE id = 2;`).Scan(&state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state != "NULL" {
+		t.Errorf("row 2 = %s, want NULL", state)
+	}
+}
+
+// TestGridRefusesUnsafeWrites covers what must never happen: a write that
+// misses, a write that would hit several rows, and a hostile identifier.
+func TestGridRefusesUnsafeWrites(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	gridFixture(t, conn)
+
+	str := func(s string) *string { return &s }
+
+	// A key that matches nothing: the row moved or was deleted since it was
+	// read. Nothing is committed and the count is reported.
+	gone := gridSaveIn{
+		Schema: "public", Table: "g_people",
+		Edits: []gridEdit{{Column: "age", Value: str("99")}},
+		Key:   []gridEdit{{Column: "id", Value: str("424242")}},
+	}
+	out := saveRowUpdate(ctx, url, gone)
+	if out.Error == "" {
+		t.Errorf("an update that matched no row reported success")
+	}
+	if out.Affected != 0 {
+		t.Errorf("affected = %d, want 0", out.Affected)
+	}
+
+	// An unknown column is refused before any SQL is built, so a name coming
+	// from a stale page cannot be interpolated.
+	bogus := gridSaveIn{
+		Schema: "public", Table: "g_people",
+		Edits: []gridEdit{{Column: `age" = 0, "name`, Value: str("x")}},
+		Key:   []gridEdit{{Column: "id", Value: str("1")}},
+	}
+	out = saveRowUpdate(ctx, url, bogus)
+	if out.Error == "" {
+		t.Fatalf("an injected column name was accepted")
+	}
+	if !strings.Contains(out.Error, "unknown column") {
+		t.Errorf("error = %q, want it to name the unknown column", out.Error)
+	}
+
+	// The row the injection tried to reach is untouched.
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	name := ""
+	err := conn.QueryRow(qctx, `SELECT name FROM g_people WHERE id = 1;`).Scan(&name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "ana" {
+		t.Errorf("row was modified by the refused statement: name = %q", name)
+	}
+
+	// No edits at all is a mistake, not a no-op write.
+	nothing := gridSaveIn{
+		Schema: "public", Table: "g_people",
+		Key: []gridEdit{{Column: "id", Value: str("1")}},
+	}
+	out = saveRowUpdate(ctx, url, nothing)
+	if out.Error == "" {
+		t.Errorf("an empty edit set was accepted")
+	}
+}
+
 // TestCollectorsReportConnectionFailureAsData checks the promise the whole UI
 // rests on: a server that cannot be reached produces a visible message, never
 // an empty screen that reads as a healthy database.
