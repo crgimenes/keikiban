@@ -104,6 +104,64 @@ window.runQuery = async (sql) => ({
 
 window.cancelQuery = async () => {};
 
+// Migrations screen: stateful like the connections mock, so run/revert/capture
+// exercise the whole flow offline. No published screenshot uses this screen,
+// so the fictional file names break no policy.
+const MIG = {
+  applied: 2,
+  pending: ["003_add_invoices.up.sql"],
+  drift: ["index_added public.users.users_email_idx"],
+};
+
+window.migrationStatus = async (dir) => ({
+  dir: dir || "/home/crg/app/migrations",
+  dirSource: dir ? "manual" : "migration config",
+  tableExists: true,
+  applied: MIG.applied,
+  pending: MIG.pending,
+  drift: { snapVersion: MIG.applied, changes: MIG.drift },
+});
+
+window.migrationPreview = async (dir, action, name) => {
+  if (action === "up") {
+    return {
+      files: MIG.pending.map((f) => ({
+        name: f,
+        def: "CREATE TABLE invoices (\n  id bigserial PRIMARY KEY,\n  total numeric NOT NULL\n);",
+      })),
+    };
+  }
+  if (action === "down") {
+    return { files: [{ name: "002_add_users.down.sql", def: "DROP TABLE users;" }] };
+  }
+  return {
+    files: [
+      { name: "004_" + name + ".up.sql", def: "CREATE INDEX users_email_idx ON users (email);" },
+      { name: "004_" + name + ".down.sql", def: "DROP INDEX users_email_idx;" },
+    ],
+  };
+};
+
+window.migrationApply = async (dir, action, name) => {
+  let message = "";
+  if (action === "up") {
+    MIG.applied += MIG.pending.length;
+    message = "applied " + MIG.pending.length + " migration(s): " + MIG.pending.join(", ");
+    MIG.pending = [];
+  }
+  if (action === "down") {
+    MIG.applied -= 1;
+    MIG.pending = ["00" + (MIG.applied + 1) + "_reverted.up.sql", ...MIG.pending];
+    message = "reverted 1 migration(s)";
+  }
+  if (action === "capture") {
+    message = "captured drift as version " + (MIG.applied + 1) + " (004_" + name + ".up.sql, 004_" + name + ".down.sql)";
+    MIG.drift = [];
+    MIG.applied += 1;
+  }
+  return { message, status: await window.migrationStatus(dir) };
+};
+
 window.objectDetail = async () => {
   const schema = PARAMS.get("schema");
   const name = PARAMS.get("name");

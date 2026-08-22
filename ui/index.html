@@ -23,6 +23,7 @@
     <button type="button" class="nav-item" data-screen="sessions">Sessions</button>
     <button type="button" class="nav-item" data-screen="indexes">Indexes</button>
     <button type="button" class="nav-item" data-screen="maintenance">Maintenance</button>
+    <button type="button" class="nav-item" data-screen="migrations">Migrations</button>
     <button type="button" class="nav-item" data-screen="connections">Connections</button>
   </nav>
 
@@ -217,6 +218,58 @@
          worse to a screen reader than the plain disclosure buttons below,
          which announce their own expanded state. -->
     <div id="br-tree" aria-label="Database objects"></div>
+  </section>
+
+  <section id="migrations" hidden>
+    <div class="dash-header">
+      <h2>Migrations</h2>
+      <div class="buttons dash-actions">
+        <button type="button" id="mig-refresh">Refresh</button>
+      </div>
+    </div>
+    <p id="mig-status" class="hint" aria-live="polite"></p>
+
+    <div id="mig-dirbox">
+      <label>Migrations directory
+        <input type="text" id="mig-dir" autocomplete="off" spellcheck="false"
+          placeholder="/path/to/migrations">
+      </label>
+      <p id="mig-dir-note" class="hint"></p>
+    </div>
+
+    <p id="mig-summary"></p>
+
+    <h3>Pending</h3>
+    <p class="hint">Migration files newer than the applied version, in the
+      order they would run. Run shows their exact SQL first.</p>
+    <div id="mig-pending"></div>
+    <div class="buttons">
+      <button type="button" id="mig-revert">Revert last</button>
+      <button type="button" id="mig-run">Run pending</button>
+    </div>
+
+    <h3>Drift</h3>
+    <p class="hint">The live schema compared with the latest snapshot in the
+      migrations directory. Capture turns the difference into a reviewed
+      up/down pair and records it as applied.</p>
+    <div id="mig-drift"></div>
+    <div class="buttons">
+      <label class="slice-label">Name
+        <input type="text" id="mig-capture-name" autocomplete="off"
+          spellcheck="false" value="drift">
+      </label>
+      <button type="button" id="mig-capture">Capture drift</button>
+    </div>
+
+    <div id="mig-confirm" hidden>
+      <p id="mig-confirm-text"></p>
+      <div id="mig-confirm-files"></div>
+      <div class="buttons">
+        <button type="button" id="mig-cancel">Cancel</button>
+        <button type="button" id="mig-go" class="destructive"></button>
+      </div>
+    </div>
+    <p id="mig-result" aria-live="polite"></p>
   </section>
 
   <section id="maintenance" hidden>

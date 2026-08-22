@@ -171,6 +171,27 @@ func runJSON(cfg Config, configErr string, args []string) {
 		if report.Error != "" {
 			os.Exit(1)
 		}
+	case "migrations":
+		if configErr != "" {
+			_ = enc.Encode(map[string]string{"error": configErr})
+			os.Exit(1)
+		}
+		if len(cfg.Connections) == 0 {
+			_ = enc.Encode(map[string]string{"error": "no connections configured"})
+			os.Exit(1)
+		}
+		// Status only, and the status path is strictly read-only: an agent
+		// checking migration state must not be able to alter the database.
+		// Running or capturing stays in the window, behind the confirmation.
+		dir := ""
+		if len(args) > 1 {
+			dir = args[1]
+		}
+		out := collectMigrationStatus(context.Background(), cfg.Connections[0].URL, dir)
+		_ = enc.Encode(out)
+		if out.Error != "" {
+			os.Exit(1)
+		}
 	// The browser commands share one preamble: they all need a database and
 	// they all take arguments, unlike the report commands above.
 	case "schemas", "objects", "describe", "search":
@@ -188,7 +209,8 @@ func runJSON(cfg Config, configErr string, args []string) {
 			"error": fmt.Sprintf("unknown command %q", command),
 			"commands": []string{
 				"connections", "dashboard", "describe", "indexes", "locks",
-				"maintenance", "objects", "schemas", "search", "sessions",
+				"maintenance", "migrations", "objects", "schemas", "search",
+				"sessions",
 			},
 		})
 		os.Exit(1)
@@ -632,6 +654,39 @@ func runGUI(cfg Config, configErr string) {
 			}, nil
 		}
 		return searchObjects(context.Background(), dbURL, term), nil
+	})
+
+	// The Migrations screen. Like every bind, the database is resolved per
+	// call, never captured; the dir travels from the page because the manual
+	// fallback lives there.
+	mustBind(w, "migrationStatus", func(dir string) (migStatusOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return migStatusOut{Error: err.Error(), Pending: []string{}}, nil
+		}
+		return collectMigrationStatus(context.Background(), dbURL, dir), nil
+	})
+
+	mustBind(w, "migrationPreview", func(dir, action, name string) (migPreviewOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return migPreviewOut{Error: err.Error(), Files: []namedDef{}}, nil
+		}
+		return collectMigrationPreview(context.Background(), dbURL, dir, action, name), nil
+	})
+
+	mustBind(w, "migrationApply", func(dir, action, name string) (migApplyOut, error) {
+		mu.Lock()
+		dbURL, err := activeDB()
+		mu.Unlock()
+		if err != nil {
+			return migApplyOut{Error: err.Error()}, nil
+		}
+		return applyMigrationAction(context.Background(), dbURL, dir, action, name), nil
 	})
 
 	// signalBackend cancels a query or terminates a connection: the same

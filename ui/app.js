@@ -55,7 +55,7 @@ let editingIndex = null;
 // ?screen= override exists for the screenshot harness, which needs to open a
 // given screen headlessly; the app itself navigates with no query string.
 const SCREENS = ["dashboard", "browser", "sessions", "indexes", "maintenance",
-  "connections"];
+  "migrations", "connections"];
 let screen = new URLSearchParams(location.search).get("screen") || "dashboard";
 if (!SCREENS.includes(screen)) screen = "dashboard";
 
@@ -65,6 +65,7 @@ const NAV_ICONS = {
   sessions: "activity",
   indexes: "diagram",
   maintenance: "wrench",
+  migrations: "stack",
   connections: "gear",
 };
 
@@ -78,6 +79,7 @@ function loadScreen(name) {
   if (name === "indexes") loadIndexes();
   if (name === "maintenance") loadMaintenance();
   if (name === "browser") loadBrowser();
+  if (name === "migrations") loadMigrations();
 }
 
 function goTo(name) {
@@ -223,7 +225,7 @@ async function connectToIndex(index) {
 
 function render() {
   const sections = ["setup", "list", "dashboard", "sessions", "indexes",
-    "maintenance", "browser"];
+    "maintenance", "migrations", "browser"];
   const hideAll = () => sections.forEach((id) => { el(id).hidden = true; });
 
   el("config-error-box").hidden = !state.error;
@@ -1785,6 +1787,186 @@ function renderSequences(list) {
 
 el("maint-refresh").addEventListener("click", loadMaintenance);
 
+/* Migrations screen --------------------------------------------------------
+   Embeds the migration project's library. The dir field empty means "use the
+   directory migration itself has saved for this database"; typing one takes
+   over. Every action previews its exact SQL and confirms naming the database,
+   the same anatomy as dropping an index. */
+
+let migState = null;
+let migAction = null;
+
+// migDir is the directory actually in effect: the manual field wins, the one
+// resolved from migration's config otherwise.
+function migDir() {
+  const manual = el("mig-dir").value.trim();
+  if (manual) return manual;
+  if (migState) return migState.dir;
+  return "";
+}
+
+async function loadMigrations() {
+  el("mig-status").textContent = "Reading migration state...";
+  try {
+    migState = await window.migrationStatus(el("mig-dir").value.trim());
+  } catch (err) {
+    el("mig-status").textContent = String(err);
+    return;
+  }
+  renderMigrations();
+}
+
+function renderMigrations() {
+  const s = migState;
+  if (!s) return;
+  el("mig-status").textContent = s.error || "";
+
+  const note = el("mig-dir-note");
+  if (el("mig-dir").value.trim()) {
+    note.textContent = "Manual directory. Save this connection in migration " +
+      "to make the pairing permanent.";
+  } else if (s.dir) {
+    note.textContent = "Using " + s.dir + " (from migration's saved connections).";
+  } else {
+    note.textContent = "No saved migration connection matches this database " +
+      "URL. Enter the migrations directory above.";
+  }
+
+  const summary = el("mig-summary");
+  summary.replaceChildren();
+  if (s.dir && !s.error) {
+    const meta = document.createElement("span");
+    meta.className = "idx-meta";
+    const applied = document.createElement("span");
+    applied.textContent = s.tableExists
+      ? "version " + s.applied + " applied"
+      : "no schema_migrations table yet (created by the first run)";
+    const pending = document.createElement("span");
+    pending.textContent = s.pending.length + " pending";
+    if (s.pending.length > 0) pending.classList.add("warn-text");
+    meta.append(applied, pending);
+    summary.append(meta);
+  }
+
+  const box = el("mig-pending");
+  box.replaceChildren();
+  if (s.pending.length === 0) {
+    const none = document.createElement("p");
+    none.className = "hint";
+    none.textContent = "Nothing pending.";
+    box.append(none);
+  }
+  for (const f of s.pending) {
+    const cell = document.createElement("div");
+    cell.className = "cell sql-text";
+    cell.textContent = f;
+    box.append(cell);
+  }
+
+  const driftBox = el("mig-drift");
+  driftBox.replaceChildren();
+  const d = s.drift;
+  if (d && d.error) {
+    const err = document.createElement("p");
+    err.className = "hint";
+    err.textContent = d.error;
+    driftBox.append(err);
+  }
+  if (d && !d.error && d.changes.length === 0) {
+    const ok = document.createElement("p");
+    ok.className = "hint";
+    ok.textContent = "No drift against snapshot " + d.snapVersion + ".";
+    driftBox.append(ok);
+  }
+  if (d && !d.error) {
+    for (const c of d.changes) {
+      const cell = document.createElement("div");
+      cell.className = "cell sql-text";
+      cell.textContent = c;
+      driftBox.append(cell);
+    }
+  }
+
+  const ready = s.dir && !s.error;
+  el("mig-run").disabled = !ready || s.pending.length === 0;
+  el("mig-revert").disabled = !ready || !s.tableExists || s.applied === 0;
+  el("mig-capture").disabled = !ready || !d || !!d.error || d.changes.length === 0;
+}
+
+function showMigResult(text) {
+  el("mig-result").textContent = text;
+}
+
+// migAskConfirm fetches the exact SQL the action would run or write and puts
+// it on screen with a confirmation that names the database — the destructive
+// action is never the default-looking button.
+async function migAskConfirm(action, label) {
+  showMigResult("");
+  let p = null;
+  try {
+    p = await window.migrationPreview(migDir(), action,
+      el("mig-capture-name").value.trim());
+  } catch (err) {
+    showMigResult(String(err));
+    return;
+  }
+  if (p.error) {
+    showMigResult(p.error);
+    return;
+  }
+  if (p.files.length === 0) {
+    showMigResult(p.note || "nothing to do");
+    return;
+  }
+
+  migAction = action;
+  const conn = state.connections[state.active];
+  const where = conn ? conn.title : "the connected database";
+  el("mig-confirm-text").textContent = label + " on " + where +
+    "? This is exactly what will run:";
+
+  const files = el("mig-confirm-files");
+  files.replaceChildren();
+  for (const f of p.files) {
+    const name = document.createElement("div");
+    name.className = "top-label";
+    name.textContent = f.name;
+    const sql = document.createElement("div");
+    sql.className = "sql-text";
+    sql.textContent = f.def;
+    files.append(name, sql);
+  }
+  el("mig-go").textContent = label;
+  el("mig-confirm").hidden = false;
+}
+
+async function migConfirm() {
+  el("mig-go").disabled = true;
+  let out = null;
+  try {
+    out = await window.migrationApply(migDir(), migAction,
+      el("mig-capture-name").value.trim());
+  } catch (err) {
+    out = { error: String(err) };
+  }
+  el("mig-go").disabled = false;
+  el("mig-confirm").hidden = true;
+  if (out.status) migState = out.status;
+  showMigResult(out.error || out.message || "");
+  renderMigrations();
+}
+
+el("mig-refresh").addEventListener("click", loadMigrations);
+el("mig-dir").addEventListener("change", loadMigrations);
+el("mig-run").addEventListener("click", () => migAskConfirm("up", "Run pending"));
+el("mig-revert").addEventListener("click", () => migAskConfirm("down", "Revert last"));
+el("mig-capture").addEventListener("click", () => migAskConfirm("capture", "Capture drift"));
+el("mig-cancel").addEventListener("click", () => {
+  el("mig-confirm").hidden = true;
+  migAction = null;
+});
+el("mig-go").addEventListener("click", migConfirm);
+
 el("ext-badge").addEventListener("click", () => {
   el("ext-tip").hidden = !el("ext-tip").hidden;
 });
@@ -2001,7 +2183,8 @@ el("sess-active-only").addEventListener("change", renderSessions);
 
 // Every screen's Refresh button carries the same icon, so the action reads the
 // same wherever it appears.
-for (const id of ["br-refresh", "idx-refresh", "maint-refresh", "sess-refresh"]) {
+for (const id of ["br-refresh", "idx-refresh", "maint-refresh", "mig-refresh",
+  "sess-refresh"]) {
   el(id).prepend(icon("arrow-clockwise"));
 }
 el("test").prepend(icon("plug"));

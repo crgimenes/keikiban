@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/crgimenes/migration/introspect"
+	"github.com/crgimenes/migration/snapshot"
 	"github.com/jackc/pgx/v5"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
@@ -1074,6 +1077,238 @@ func TestRunQueryCancels(t *testing.T) {
 		}
 	case <-time.After(20 * time.Second):
 		t.Fatalf("cancelling did not stop the query")
+	}
+}
+
+// migFixtureDir writes a migrations directory with two known pairs.
+func migFixtureDir(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	files := map[string]string{
+		"001_users.up.sql":   "CREATE TABLE mig_users (id bigserial PRIMARY KEY, email text);",
+		"001_users.down.sql": "DROP TABLE mig_users;",
+		"002_notes.up.sql":   "CREATE TABLE mig_notes (id bigserial PRIMARY KEY, body text);",
+		"002_notes.down.sql": "DROP TABLE mig_notes;",
+	}
+	for name, sql := range files {
+		err := os.WriteFile(filepath.Join(dir, name), []byte(sql), 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// TestMigrationStatusIsReadOnly pins the screen's core promise: looking at
+// migration state must not create the tracking table on the server.
+func TestMigrationStatusIsReadOnly(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	dir := migFixtureDir(t)
+
+	mustExec(t, conn, `DROP TABLE IF EXISTS schema_migrations, mig_users, mig_notes;`)
+
+	out := collectMigrationStatus(ctx, url, dir)
+	if out.Error != "" {
+		t.Fatalf("status error: %s", out.Error)
+	}
+	if out.TableExists {
+		t.Errorf("tableExists = true on a clean database")
+	}
+	if out.Applied != 0 {
+		t.Errorf("applied = %d, want 0", out.Applied)
+	}
+	if len(out.Pending) != 2 {
+		t.Errorf("pending = %v, want the two fixtures", out.Pending)
+	}
+	if out.DirSource != "manual" {
+		t.Errorf("dirSource = %q, want manual", out.DirSource)
+	}
+	// Drift needs a snapshot, and saying so is data, not failure.
+	if out.Drift == nil || out.Drift.Error == "" {
+		t.Errorf("drift without a snapshot should carry its own error, got %+v", out.Drift)
+	}
+
+	// The promise itself: status must not have created schema_migrations.
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	n := 0
+	err := conn.QueryRow(qctx,
+		`SELECT count(*) FROM information_schema.tables WHERE table_name='schema_migrations';`).Scan(&n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("reading status CREATED schema_migrations — the read path wrote to the database")
+	}
+}
+
+// TestMigrationUpDownCycle runs the fixtures up, checks the preview matches
+// the files, reverts one, and checks the versions the whole way.
+func TestMigrationUpDownCycle(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	dir := migFixtureDir(t)
+
+	mustExec(t, conn, `DROP TABLE IF EXISTS schema_migrations, mig_users, mig_notes;`)
+
+	preview := collectMigrationPreview(ctx, url, dir, "up", "")
+	if preview.Error != "" {
+		t.Fatalf("preview error: %s", preview.Error)
+	}
+	if len(preview.Files) != 2 {
+		t.Fatalf("preview files = %d, want 2", len(preview.Files))
+	}
+	if !strings.Contains(preview.Files[0].Def, "CREATE TABLE mig_users") {
+		t.Errorf("preview does not show the exact SQL: %q", preview.Files[0].Def)
+	}
+
+	out := applyMigrationAction(ctx, url, dir, "up", "")
+	if out.Error != "" {
+		t.Fatalf("up error: %s", out.Error)
+	}
+	if out.Status.Applied != 2 {
+		t.Errorf("applied after up = %d, want 2", out.Status.Applied)
+	}
+	if len(out.Status.Pending) != 0 {
+		t.Errorf("pending after up = %v, want none", out.Status.Pending)
+	}
+
+	// The revert path is one step, never the library's revert-everything
+	// default.
+	down := applyMigrationAction(ctx, url, dir, "down", "")
+	if down.Error != "" {
+		t.Fatalf("down error: %s", down.Error)
+	}
+	if down.Status.Applied != 1 {
+		t.Errorf("applied after down = %d, want 1 (exactly one step)", down.Status.Applied)
+	}
+	if len(down.Status.Pending) != 1 {
+		t.Errorf("pending after down = %v, want the reverted file", down.Status.Pending)
+	}
+
+	qctx, cancel := context.WithTimeout(ctx, sampleTimeout)
+	defer cancel()
+	n := 0
+	err := conn.QueryRow(qctx,
+		`SELECT count(*) FROM information_schema.tables WHERE table_name='mig_notes';`).Scan(&n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("mig_notes still exists after reverting migration 2")
+	}
+}
+
+// TestMigrationCaptureDrift snapshots the schema, alters it behind the
+// tool's back, and checks Capture turns the difference into a pair.
+func TestMigrationCaptureDrift(t *testing.T) {
+	url := startPostgres(t)
+	conn := openConn(t, url)
+	ctx := context.Background()
+	dir := migFixtureDir(t)
+
+	mustExec(t, conn, `DROP TABLE IF EXISTS schema_migrations, mig_users, mig_notes;`)
+
+	up := applyMigrationAction(ctx, url, dir, "up", "")
+	if up.Error != "" {
+		t.Fatalf("up error: %s", up.Error)
+	}
+
+	// Snapshot the current state the way migration itself does, then drift.
+	db, _, closer, err := openMigDB(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closer()
+	live, err := introspect.Read(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = snapshot.Write(dir, 2, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, conn, `ALTER TABLE mig_users ADD COLUMN nickname text;`)
+
+	status := collectMigrationStatus(ctx, url, dir)
+	if status.Drift == nil || status.Drift.Error != "" {
+		t.Fatalf("drift not detected: %+v", status.Drift)
+	}
+	if len(status.Drift.Changes) == 0 {
+		t.Fatalf("no drift changes after an out-of-band ALTER")
+	}
+
+	// The preview shows the generated pair without writing anything.
+	preview := collectMigrationPreview(ctx, url, dir, "capture", "nickname")
+	if preview.Error != "" {
+		t.Fatalf("capture preview error: %s", preview.Error)
+	}
+	if len(preview.Files) != 2 {
+		t.Fatalf("capture preview files = %d, want the up/down pair", len(preview.Files))
+	}
+	if !strings.Contains(preview.Files[0].Def, "nickname") {
+		t.Errorf("generated up SQL does not mention the drifted column: %q", preview.Files[0].Def)
+	}
+	entries, err := filepath.Glob(filepath.Join(dir, "003_*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("preview WROTE files: %v", entries)
+	}
+
+	// A hostile capture name must not escape the migrations directory.
+	bad := collectMigrationPreview(ctx, url, dir, "capture", "../escape")
+	if bad.Error == "" {
+		t.Errorf("path-traversal capture name was accepted")
+	}
+
+	out := applyMigrationAction(ctx, url, dir, "capture", "nickname")
+	if out.Error != "" {
+		t.Fatalf("capture error: %s", out.Error)
+	}
+	if out.Status.Applied != 3 {
+		t.Errorf("applied after capture = %d, want 3", out.Status.Applied)
+	}
+	if out.Status.Drift == nil || len(out.Status.Drift.Changes) != 0 {
+		t.Errorf("drift should be clean after capture: %+v", out.Status.Drift)
+	}
+	pair, err := filepath.Glob(filepath.Join(dir, "003_nickname.*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pair) != 2 {
+		t.Errorf("capture wrote %v, want the up/down pair", pair)
+	}
+}
+
+// TestMigrationDirInConfig pins the read-only parsing of migration's own
+// config: exact URL match, first match wins, missing is not an error.
+func TestMigrationDirInConfig(t *testing.T) {
+	src := `; migration configuration
+(connection "postgres://a@h/db1" "/tmp/one" "first")
+(connection "postgres://a@h/db2" "/tmp/two")
+(connection "postgres://a@h/db1" "/tmp/shadowed")
+`
+	dir, err := migrationDirInConfig(src, "postgres://a@h/db2")
+	if err != nil || dir != "/tmp/two" {
+		t.Errorf("dir = %q err = %v, want /tmp/two", dir, err)
+	}
+	dir, err = migrationDirInConfig(src, "postgres://a@h/db1")
+	if err != nil || dir != "/tmp/one" {
+		t.Errorf("first match should win, got %q err = %v", dir, err)
+	}
+	dir, err = migrationDirInConfig(src, "postgres://a@h/other")
+	if err != nil || dir != "" {
+		t.Errorf("no match should be empty, got %q err = %v", dir, err)
+	}
+	dir, err = migrationDirInConfig("; only comments\n", "postgres://a@h/db1")
+	if err != nil || dir != "" {
+		t.Errorf("comments-only config should be empty, got %q err = %v", dir, err)
 	}
 }
 
