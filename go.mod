@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/crgimenes/filo v0.0.23
-	github.com/crgimenes/glaze v0.0.54
+	github.com/crgimenes/glaze v0.0.61
 	github.com/crgimenes/migration v1.0.4-0.20260822074342-bc3c7cf502be
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jmoiron/sqlx v1.4.0
