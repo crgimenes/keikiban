@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
       # Audited findings carry an explicit // #nosec Gxxx; a bare nosec is
       # not accepted here.
       - run: gosec -quiet ./...
