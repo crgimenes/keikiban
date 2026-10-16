@@ -60,7 +60,7 @@ jobs:
         # staticcheck predates Go 1.27 and panics on its stdlib (buildir,
         # "unexpected expr" in internal/poll — Linux runners only, where the
         # offending code path exists).
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.1
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
       - run: golangci-lint run ./...
 
   security:
