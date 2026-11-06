@@ -4,8 +4,8 @@ go 1.27.1
 
 require (
 	github.com/crgimenes/filo v0.1.1
-	github.com/crgimenes/glaze v0.0.82
-	github.com/crgimenes/migration v1.0.4-0.20261106093200-f60abf520109
+	github.com/crgimenes/glaze v0.0.83
+	github.com/crgimenes/migration v1.0.4-0.20261106144425-73a887839ae0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.43.0
