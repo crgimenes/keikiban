@@ -3,9 +3,9 @@ module github.com/crgimenes/keikiban
 go 1.27.1
 
 require (
-	github.com/crgimenes/filo v0.1.1
+	github.com/crgimenes/filo v0.1.2
 	github.com/crgimenes/glaze v0.0.83
-	github.com/crgimenes/migration v1.0.4-0.20261108150027-049917394bdd
+	github.com/crgimenes/migration v1.0.4-0.20261110034817-84a6e4c555bb
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.43.0
@@ -64,8 +64,8 @@ require (
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
