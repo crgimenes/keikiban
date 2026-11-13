@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/crgimenes/migration/gen"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
 )
 
 // The Migrations screen embeds the migration project's library packages
@@ -25,7 +25,7 @@ import (
 // direction. The two apps stay independent: keikiban only READS migration's
 // config to find the directory for the connected database, and the library
 // packages register no SQL driver, so the connection here is keikiban's own
-// pgx one wrapped for sqlx.
+// pgx one through database/sql.
 //
 // Read paths (status, drift, previews) never write anything — not even the
 // schema_migrations tracking table, which the migration CLI creates on first
@@ -147,9 +147,8 @@ func migrationDirInConfig(src, dbURL string) (string, error) {
 
 // openMigDB wraps keikiban's own pgx connection for the migration packages.
 // stdlib.OpenDB takes the parsed config directly, so no database/sql driver
-// name is ever registered or looked up; the "postgres" passed to sqlx only
-// selects $1 placeholders.
-func openMigDB(ctx context.Context, dbURL string) (*sqlx.DB, *core.DatabaseConfig, func(), error) {
+// name is ever registered or looked up.
+func openMigDB(ctx context.Context, dbURL string) (*sql.DB, *core.DatabaseConfig, func(), error) {
 	cfg, err := core.GetDatabaseConfig(dbURL)
 	if err != nil {
 		return nil, nil, nil, err
@@ -160,7 +159,7 @@ func openMigDB(ctx context.Context, dbURL string) (*sqlx.DB, *core.DatabaseConfi
 		return nil, nil, nil, err
 	}
 
-	db := sqlx.NewDb(stdlib.OpenDB(*connCfg), "postgres")
+	db := stdlib.OpenDB(*connCfg)
 	closer := func() { _ = db.Close() }
 
 	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
@@ -234,7 +233,7 @@ func collectMigrationStatus(ctx context.Context, dbURL, dir string) migStatusOut
 	// Existence is checked with the library's own read-only query; the
 	// create-if-missing entry points stay out of the read path on purpose.
 	count := 0
-	err = db.GetContext(qctx, &count, cfg.CheckTableExistsSQL)
+	err = db.QueryRowContext(qctx, cfg.CheckTableExistsSQL).Scan(&count)
 	if err != nil {
 		out.Error = err.Error()
 		return out
@@ -298,7 +297,7 @@ func collectMigrationPreview(ctx context.Context, dbURL, dir, action, name strin
 
 	applied := 0
 	count := 0
-	err = db.GetContext(qctx, &count, cfg.CheckTableExistsSQL)
+	err = db.QueryRowContext(qctx, cfg.CheckTableExistsSQL).Scan(&count)
 	if err != nil {
 		out.Error = err.Error()
 		return out
