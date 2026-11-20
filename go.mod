@@ -3,9 +3,9 @@ module github.com/crgimenes/keikiban
 go 1.27.4
 
 require (
-	github.com/crgimenes/filo v0.1.4
+	github.com/crgimenes/filo v0.1.5
 	github.com/crgimenes/glaze v0.0.86
-	github.com/crgimenes/migration v1.0.4-0.20261120122116-8fe67b7a54e0
+	github.com/crgimenes/migration v1.0.4-0.20261120144637-29560f9e55dd
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.43.0
 )
