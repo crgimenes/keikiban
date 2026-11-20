@@ -87,7 +87,7 @@ jobs:
       # catch a syntax error before it reaches the window at runtime. The glob
       # covers files added later; a fixed list already missed object.js once.
       - run: |
-          for f in ui/*.js tools/uimock/*.js; do
+          for f in cmd/keikiban/ui/*.js tools/uimock/*.js; do
             echo "check $f"
             node --check "$f" || exit 1
           done

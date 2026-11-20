@@ -3,7 +3,7 @@
 #
 #   sh tools/uimock/serve.sh [port]     then open http://localhost:8791
 #
-# Useful for screenshots and for working on the UI offline. It copies ui/ to a
+# Useful for screenshots and for working on the UI offline. It copies cmd/keikiban/ui/ to a
 # temporary directory and injects mock.js ahead of app.js, so the real files
 # are never touched.
 
@@ -13,8 +13,8 @@ cd "$(dirname "$0")/../.."
 PORT="${1:-8791}"
 DIR=$(mktemp -d)
 
-cp ui/index.html ui/app.js ui/style.css ui/icons.js ui/favicon.png "$DIR/"
-cp ui/object.html ui/object.js "$DIR/"
+cp cmd/keikiban/ui/index.html cmd/keikiban/ui/app.js cmd/keikiban/ui/style.css cmd/keikiban/ui/icons.js cmd/keikiban/ui/favicon.png "$DIR/"
+cp cmd/keikiban/ui/object.html cmd/keikiban/ui/object.js "$DIR/"
 cp tools/uimock/mock.js "$DIR/"
 cp -R tools/uimock/recorded "$DIR/recorded"
 # The mock must define window.* before the page script runs, in both windows:

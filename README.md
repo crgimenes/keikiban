@@ -92,8 +92,7 @@ to stderr.
 
 ## Build
 
-    go build
-
+    go build ./cmd/keikiban
 Go 1.26, no cgo. Runtime dependencies are
 [glaze](https://github.com/crgimenes/glaze) for the window,
 [filo](https://github.com/crgimenes/filo) for the config file and

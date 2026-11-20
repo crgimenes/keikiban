@@ -6,7 +6,7 @@
 #
 # Produces:
 #   assets/keikiban.icns   macOS app bundle icon
-#   ui/favicon.png         the icon the window itself shows on Windows/Linux
+#   cmd/keikiban/ui/favicon.png         the icon the window itself shows on Windows/Linux
 #   web/favicon.png        the project site
 
 set -eu
@@ -24,8 +24,8 @@ for size in 16 32 128 256 512; do
 done
 
 iconutil -c icns "$SET" -o assets/keikiban.icns
-sips -z 256 256 "$MASTER" --out ui/favicon.png >/dev/null
+sips -z 256 256 "$MASTER" --out cmd/keikiban/ui/favicon.png >/dev/null
 mkdir -p web
-cp ui/favicon.png web/favicon.png
+cp cmd/keikiban/ui/favicon.png web/favicon.png
 
-echo "wrote assets/keikiban.icns, ui/favicon.png, web/favicon.png"
+echo "wrote assets/keikiban.icns, cmd/keikiban/ui/favicon.png, web/favicon.png"
